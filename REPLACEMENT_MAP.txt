@@ -1,0 +1,35 @@
+# This mapping contains exact C code (key) that has to be replaced (manually) with the corresponding V code for version fuctions; put in REPLACEMENT_MAP in src/vgenerator.py.
+# genType will then replace c_body with v_body
+REPLACEMENT_MAP = {
+    '\n#define VK_DEFINE_HANDLE(object) typedef struct object##_T* object;\n':
+    '',
+    '\n#ifndef VK_USE_64_BIT_PTR_DEFINES\n    #if defined(__LP64__) || defined(_WIN64) || (defined(__x86_64__) && !defined(__ILP32__) ) || defined(_M_X64) || defined(__ia64) || defined (_M_IA64) || defined(__aarch64__) || defined(__powerpc64__) || (defined(__riscv) && __riscv_xlen == 64)\n        #define VK_USE_64_BIT_PTR_DEFINES 1\n    #else\n        #define VK_USE_64_BIT_PTR_DEFINES 0\n    #endif\n#endif\n':
+    '',
+    '\n#ifndef VK_DEFINE_NON_DISPATCHABLE_HANDLE\n    #if (VK_USE_64_BIT_PTR_DEFINES==1)\n        #if (defined(__cplusplus) && (__cplusplus >= 201103L)) || (defined(_MSVC_LANG) && (_MSVC_LANG >= 201103L))\n            #define VK_NULL_HANDLE nullptr\n        #else\n            #define VK_NULL_HANDLE ((void*)0)\n        #endif\n    #else\n        #define VK_NULL_HANDLE 0ULL\n    #endif\n#endif\n#ifndef VK_NULL_HANDLE\n    #define VK_NULL_HANDLE 0\n#endif\n':
+    '',
+    '\n#ifndef VK_DEFINE_NON_DISPATCHABLE_HANDLE\n    #if (VK_USE_64_BIT_PTR_DEFINES==1)\n        #define VK_DEFINE_NON_DISPATCHABLE_HANDLE(object) typedef struct object##_T *object;\n    #else\n        #define VK_DEFINE_NON_DISPATCHABLE_HANDLE(object) typedef uint64_t object;\n    #endif\n#endif\n':
+    '',
+    '#define VK_MAKE_API_VERSION(variant, major, minor, patch) \\\n    ((((uint32_t)(variant)) << 29U) | (((uint32_t)(major)) << 22U) | (((uint32_t)(minor)) << 12U) | ((uint32_t)(patch)))\n':
+    '',
+    '// Vulkan 1.0 version number\n#define VK_API_VERSION_1_0 VK_MAKE_API_VERSION(0, 1, 0, 0)// Patch version should always be set to 0\n':
+    '',
+    '// Complete version of this file\n#define VK_HEADER_VERSION_COMPLETE VK_MAKE_API_VERSION(0, 1, 3, VK_HEADER_VERSION)\n':
+    '',
+    '// VK_MAKE_VERSION is deprecated, but no reason was given in the API XML\n// DEPRECATED: This define is deprecated. VK_MAKE_API_VERSION should be used instead.\n#define VK_MAKE_VERSION(major, minor, patch) \\\n    ((((uint32_t)(major)) << 22U) | (((uint32_t)(minor)) << 12U) | ((uint32_t)(patch)))\n':
+    '',
+    '// VK_VERSION_MAJOR is deprecated, but no reason was given in the API XML\n// DEPRECATED: This define is deprecated. VK_API_VERSION_MAJOR should be used instead.\n#define VK_VERSION_MAJOR(version) ((uint32_t)(version) >> 22U)\n':
+    '',
+    '// VK_VERSION_MINOR is deprecated, but no reason was given in the API XML\n// DEPRECATED: This define is deprecated. VK_API_VERSION_MINOR should be used instead.\n#define VK_VERSION_MINOR(version) (((uint32_t)(version) >> 12U) & 0x3FFU)\n':
+    '',
+    '// VK_VERSION_PATCH is deprecated, but no reason was given in the API XML\n// DEPRECATED: This define is deprecated. VK_API_VERSION_PATCH should be used instead.\n#define VK_VERSION_PATCH(version) ((uint32_t)(version) & 0xFFFU)\n':
+    '',
+    '#define VK_API_VERSION_VARIANT(version) ((uint32_t)(version) >> 29U)':
+    '',
+    '#define VK_API_VERSION_MAJOR(version) (((uint32_t)(version) >> 22U) & 0x7FU)':
+    '',
+    '#define VK_API_VERSION_MINOR(version) (((uint32_t)(version) >> 12U) & 0x3FFU)':
+    '',
+    '#define VK_API_VERSION_PATCH(version) ((uint32_t)(version) & 0xFFFU)':
+    '',
+    
+}

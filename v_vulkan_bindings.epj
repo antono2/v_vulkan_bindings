@@ -1,0 +1,243 @@
+{
+  "header": {
+    "comment": "eric project file for project v_vulkan_bindings",
+    "copyright": "Copyright (C) 2024 , ",
+    "saved": "2024-09-23, 21:45:03"
+  },
+  "project": {
+    "AUTHOR": "",
+    "CHECKERSPARMS": {},
+    "DESCRIPTION": "",
+    "DOCSTRING": "",
+    "DOCUMENTATIONPARMS": {},
+    "EMAIL": "",
+    "EMBEDDED_VENV": false,
+    "EOL": 0,
+    "FILETYPES": {
+      "*.cfg": "OTHERS",
+      "*.epj": "OTHERS",
+      "*.ini": "OTHERS",
+      "*.json": "OTHERS",
+      "*.md": "OTHERS",
+      "*.py": "SOURCES",
+      "*.py3": "SOURCES",
+      "*.pyw": "SOURCES",
+      "*.pyw3": "SOURCES",
+      "*.rst": "OTHERS",
+      "*.toml": "OTHERS",
+      "*.txt": "OTHERS",
+      "*.yaml": "OTHERS",
+      "*.yml": "OTHERS",
+      "GNUmakefile": "OTHERS",
+      "Makefile": "OTHERS",
+      "README": "OTHERS",
+      "README.*": "OTHERS",
+      "makefile": "OTHERS"
+    },
+    "FORMS": [],
+    "HASH": "e277e31fd81b562c2f3ad715414e5f966e30bb40",
+    "IDLPARAMS": {
+      "DefinedNames": [],
+      "IncludeDirs": [],
+      "UndefinedNames": []
+    },
+    "LEXERASSOCS": {},
+    "LICENSE": "",
+    "MAINSCRIPT": "src/main.py",
+    "MAKEPARAMS": {
+      "MakeEnabled": false,
+      "MakeExecutable": "",
+      "MakeFile": "",
+      "MakeParameters": "",
+      "MakeTarget": "",
+      "MakeTestOnly": true
+    },
+    "MIXEDLANGUAGE": false,
+    "OTHERS": [
+      ".gitignore",
+      "NOTES.txt",
+      "README.md",
+      "REPLACEMENT_MAP.txt",
+      "submodules/vulkandocs/LICENSES/Apache-2.0.txt",
+      "submodules/vulkandocs/LICENSES/CC-BY-4.0.txt",
+      "submodules/vulkandocs/LICENSES/LicenseRef-MPLUS.txt",
+      "submodules/vulkandocs/LICENSES/MIT.txt",
+      "submodules/vulkandocs/Makefile",
+      "submodules/vulkandocs/README.adoc",
+      "submodules/vulkandocs/antora/Makefile",
+      "submodules/vulkandocs/antora/features/antora.yml",
+      "submodules/vulkandocs/antora/spec/antora.yml",
+      "submodules/vulkandocs/build_tests/README.adoc",
+      "submodules/vulkandocs/build_tests/expectations/validusage.json",
+      "submodules/vulkandocs/config/README.adoc",
+      "submodules/vulkandocs/config/chunkindex/README.adoc",
+      "submodules/vulkandocs/config/themes/pdf-theme.yml",
+      "submodules/vulkandocs/config/vu-to-json/vu_schema.json",
+      "submodules/vulkandocs/images/README.adoc",
+      "submodules/vulkandocs/json/vkpcc.json",
+      "submodules/vulkandocs/katex/README.md",
+      "submodules/vulkandocs/package-lock.json",
+      "submodules/vulkandocs/package.json",
+      "submodules/vulkandocs/scripts/README.adoc",
+      "submodules/vulkandocs/scripts/asciidoctor-chunker/README.md",
+      "submodules/vulkandocs/scripts/reflow-tests/README.adoc",
+      "submodules/vulkandocs/tests/README.adoc",
+      "submodules/vulkandocs/xml/Makefile",
+      "submodules/vulkandocs/xml/README.adoc",
+      "submodules/vulkandocs/xml/profiles/VP_KHR_roadmap.json",
+      "v_vulkan_bindings.epj"
+    ],
+    "OTHERTOOLSPARMS": {},
+    "PACKAGERSPARMS": {},
+    "PROGLANGUAGE": "Python3",
+    "PROJECTTYPE": "Other",
+    "PROJECTTYPESPECIFICDATA": {},
+    "RCCPARAMS": {
+      "CompressLevel": 0,
+      "CompressionDisable": false,
+      "CompressionThreshold": 70,
+      "PathPrefix": ""
+    },
+    "RESOURCES": [],
+    "SOURCES": [
+      "src/main.py",
+      "src/vgenerator.py",
+      "src/vgenerator_bk.py",
+      "submodules/vulkandocs/config/makeSubmit.py",
+      "submodules/vulkandocs/scripts/Retired/checkLinks.py",
+      "submodules/vulkandocs/scripts/Retired/extensionStubSource.py",
+      "submodules/vulkandocs/scripts/Retired/findBalance.py",
+      "submodules/vulkandocs/scripts/Retired/fixupRef.py",
+      "submodules/vulkandocs/scripts/Retired/insertTags.py",
+      "submodules/vulkandocs/scripts/Retired/realign.py",
+      "submodules/vulkandocs/scripts/Retired/refDesc.py",
+      "submodules/vulkandocs/scripts/antora-nav-features.py",
+      "submodules/vulkandocs/scripts/antora-prep.py",
+      "submodules/vulkandocs/scripts/apiconventions.py",
+      "submodules/vulkandocs/scripts/cgenerator.py",
+      "submodules/vulkandocs/scripts/check_html_xrefs.py",
+      "submodules/vulkandocs/scripts/check_spec_links.py",
+      "submodules/vulkandocs/scripts/comment_convert.py",
+      "submodules/vulkandocs/scripts/deperiodize_vuids.py",
+      "submodules/vulkandocs/scripts/docgenerator.py",
+      "submodules/vulkandocs/scripts/doctransformer.py",
+      "submodules/vulkandocs/scripts/extdependency.py",
+      "submodules/vulkandocs/scripts/extensionmetadocgenerator.py",
+      "submodules/vulkandocs/scripts/featurerequirementsgenerator.py",
+      "submodules/vulkandocs/scripts/find_duplicates.py",
+      "submodules/vulkandocs/scripts/find_equivalent_ext_require_blocks.py",
+      "submodules/vulkandocs/scripts/formatsgenerator.py",
+      "submodules/vulkandocs/scripts/genRef.py",
+      "submodules/vulkandocs/scripts/generator.py",
+      "submodules/vulkandocs/scripts/genspec.py",
+      "submodules/vulkandocs/scripts/genvk.py",
+      "submodules/vulkandocs/scripts/hostsyncgenerator.py",
+      "submodules/vulkandocs/scripts/indexExt.py",
+      "submodules/vulkandocs/scripts/interfacedocgenerator.py",
+      "submodules/vulkandocs/scripts/jsgenerator.py",
+      "submodules/vulkandocs/scripts/json_c_generator.py",
+      "submodules/vulkandocs/scripts/json_generator.py",
+      "submodules/vulkandocs/scripts/json_h_generator.py",
+      "submodules/vulkandocs/scripts/json_parser.py",
+      "submodules/vulkandocs/scripts/json_validate.py",
+      "submodules/vulkandocs/scripts/linkcheck.py",
+      "submodules/vulkandocs/scripts/makemanaliases.py",
+      "submodules/vulkandocs/scripts/map_html_anchors.py",
+      "submodules/vulkandocs/scripts/parse_dependency.py",
+      "submodules/vulkandocs/scripts/promote.py",
+      "submodules/vulkandocs/scripts/pygenerator.py",
+      "submodules/vulkandocs/scripts/reflib.py",
+      "submodules/vulkandocs/scripts/reflow.py",
+      "submodules/vulkandocs/scripts/reg.py",
+      "submodules/vulkandocs/scripts/rubygenerator.py",
+      "submodules/vulkandocs/scripts/schema_generator.py",
+      "submodules/vulkandocs/scripts/scriptgenerator.py",
+      "submodules/vulkandocs/scripts/spec_tools/__init__.py",
+      "submodules/vulkandocs/scripts/spec_tools/algo.py",
+      "submodules/vulkandocs/scripts/spec_tools/attributes.py",
+      "submodules/vulkandocs/scripts/spec_tools/base_printer.py",
+      "submodules/vulkandocs/scripts/spec_tools/consistency_tools.py",
+      "submodules/vulkandocs/scripts/spec_tools/console_printer.py",
+      "submodules/vulkandocs/scripts/spec_tools/conventions.py",
+      "submodules/vulkandocs/scripts/spec_tools/data_structures.py",
+      "submodules/vulkandocs/scripts/spec_tools/entity_db.py",
+      "submodules/vulkandocs/scripts/spec_tools/file_process.py",
+      "submodules/vulkandocs/scripts/spec_tools/html_printer.py",
+      "submodules/vulkandocs/scripts/spec_tools/macro_checker.py",
+      "submodules/vulkandocs/scripts/spec_tools/macro_checker_file.py",
+      "submodules/vulkandocs/scripts/spec_tools/main.py",
+      "submodules/vulkandocs/scripts/spec_tools/shared.py",
+      "submodules/vulkandocs/scripts/spec_tools/util.py",
+      "submodules/vulkandocs/scripts/spec_tools/validity.py",
+      "submodules/vulkandocs/scripts/spirvcapgenerator.py",
+      "submodules/vulkandocs/scripts/stripAPI.py",
+      "submodules/vulkandocs/scripts/syncgenerator.py",
+      "submodules/vulkandocs/scripts/testSpecVersion.py",
+      "submodules/vulkandocs/scripts/test_check_spec_links.py",
+      "submodules/vulkandocs/scripts/test_check_spec_links_api_specific.py",
+      "submodules/vulkandocs/scripts/test_entity_db.py",
+      "submodules/vulkandocs/scripts/test_reflow.py",
+      "submodules/vulkandocs/scripts/validitygenerator.py",
+      "submodules/vulkandocs/scripts/videocodecstestgenerator.py",
+      "submodules/vulkandocs/scripts/vkconventions.py",
+      "submodules/vulkandocs/scripts/vksc_extensions.py",
+      "submodules/vulkandocs/scripts/xml_consistency.py"
+    ],
+    "SOURCESDIR": "scripts",
+    "SPELLEXCLUDES": "",
+    "SPELLLANGUAGE": "en_US",
+    "SPELLWORDS": "",
+    "TESTING_FRAMEWORK": "",
+    "TRANSLATIONEXCEPTIONS": [],
+    "TRANSLATIONPATTERN": "",
+    "TRANSLATIONS": [],
+    "TRANSLATIONSBINPATH": "",
+    "TRANSLATIONSOURCESTARTPATH": "",
+    "UICPARAMS": {
+      "Package": "",
+      "PackagesRoot": "",
+      "RcSuffix": ""
+    },
+    "VCS": "Git",
+    "VCSOPTIONS": {
+      "add": [
+        ""
+      ],
+      "checkout": [
+        ""
+      ],
+      "commit": [
+        ""
+      ],
+      "diff": [
+        ""
+      ],
+      "export": [
+        ""
+      ],
+      "global": [
+        ""
+      ],
+      "history": [
+        ""
+      ],
+      "log": [
+        ""
+      ],
+      "remove": [
+        ""
+      ],
+      "status": [
+        ""
+      ],
+      "tag": [
+        ""
+      ],
+      "update": [
+        ""
+      ]
+    },
+    "VCSOTHERDATA": {},
+    "VERSION": "0.1"
+  }
+}
