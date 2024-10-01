@@ -1822,5 +1822,53 @@ REPLACEMENT_MAP = {{\n    {}\n}}".format(key_strings))
     def escStr(self, text) -> str:
         return text.replace(r'\\', '\\\\').replace(r'\n', '\\n')
 
+    # Note Anton: the oiginal method comes from submodules/vulkandocs/scripts/generator.py
+    def deprecationComment(self, elem, indent = 0):
+        """If an API element is marked deprecated, return a brief comment
+           describing why.
+           Otherwise, return an empty string.
 
+          - elem - Element of the API.
+            API name is determined depending on the element tag.
+          - indent - number of spaces to indent the comment"""
 
+        reason = elem.get('deprecated')
+
+        # This is almost always the path taken.
+        if reason == None:
+            return ''
+
+        # There is actually a deprecated attribute.
+        padding = indent * ' '
+
+        # Determine the API name.
+        if elem.tag == 'member' or elem.tag == 'param':
+            name = elem.find('.//name').text
+        else:
+            name = elem.get('name')
+
+        if reason == 'aliased':
+            return f'{padding}// {name} is a deprecated alias\n'
+        elif reason == 'ignored':
+            return f'{padding}// {name} is deprecated and should not be used\n'
+        elif reason == 'true':
+            return f'{padding}// {name} is deprecated, but no reason was given in the API XML\n'
+        else:
+            # This can be caught by schema validation
+            self.logMsg('error', f"{name} has an unknown deprecation attribute value '{reason}'")
+            exit(1)
+
+    # Note Anton: the oiginal method comes from submodules/vulkandocs/scripts/generator.py
+    def genRequirements(self, name, mustBeFound = True, indent = 0):
+        """Generate text showing what core versions and extensions introduce
+        an API. This exists in the base Generator class because it is used by
+        the shared enumerant-generating interfaces (buildEnumCDecl, etc.).
+        Here it returns an empty string for most generators, but can be
+        overridden by e.g. DocGenerator.
+
+        - name - name of the API
+        - mustBeFound - If True, when requirements for 'name' cannot be
+          determined, a warning comment is generated.
+        """
+
+        return ''
