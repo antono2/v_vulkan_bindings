@@ -1,7 +1,12 @@
 import sys,  os
-sys.path.append('submodules/vulkandocs/scripts')
-scriptPath = os.path.realpath(os.path.dirname(sys.argv[0]))
-os.chdir(scriptPath + '/../submodules/vulkandocs/scripts')
+import pathlib
+scriptPath = str(pathlib.Path(__file__).parent.resolve())
+vkScriptPath = scriptPath + '/../vulkandocs/scripts'
+#sys.path.append('submodules/vulkandocs/scripts')
+sys.path.append(vkScriptPath)
+#scriptPath = os.path.realpath(os.path.dirname(sys.argv[0]))
+#os.chdir(scriptPath + '/../submodules/vulkandocs/scripts')
+#os.chdir('submodules/vulkandocs/scripts')
 
 #!/usr/bin/env python3
 #
@@ -16,7 +21,7 @@ import copy
 import time
 import xml.etree.ElementTree as etree
 
-
+os.chdir(vkScriptPath)
 from cgenerator import CGeneratorOptions, COutputGenerator
 from vgenerator import VGeneratorOptions, VOutputGenerator
 from reflib import logDiag, logWarn, logErr, setLogFile
@@ -125,10 +130,10 @@ def makeGenOpts(args):
         '',
         '',
         #'#flag linux -L/usr/lib/x86_64-linux-gnu',
-        "#flag linux -I$env('VULKAN_SDK')/x86_64/include",
-        "#flag linux -I$env('VULKAN_SDK')/x86_64/include/vulkan",
-        #NOTE Anton: TODO Vlang does not allow double quotes ("") as $env parameter
-        "#flag linux -L$env('VULKAN_SDK')/x86_64/lib",
+#        "#flag linux -I$env('VULKAN_SDK')/x86_64/include",
+#        "#flag linux -I$env('VULKAN_SDK')/x86_64/include/vulkan",
+#        #NOTE Anton: TODO Vlang does not allow double quotes ("") as $env parameter
+#        "#flag linux -L$env('VULKAN_SDK')/x86_64/lib",
 #        '#flag linux -lVkLayer_core_validation',
 #        '#flag linux -lVkLayer_object_lifetimes',
 #        '#flag linux -lshaderc_shared',
@@ -145,7 +150,7 @@ def makeGenOpts(args):
 #        '#flag linux -lVkLayer_stateless_validation',
 #        '#flag linux -lVkLayer_khronos_validation',
 #        '#flag linux -lvkdisplay_xcb',
-        '#flag linux -lvulkan',
+#        '#flag linux -lvulkan',
 #        '#flag linux -lvolk',
 #        '#flag -Iinclude',
         '',
@@ -599,11 +604,12 @@ def makeGenOpts(args):
             misracppstyle     = misracppstyle)
         ]
 
-    genOpts['vlang_core.v'] = [
+    genOpts['vulkan.v'] = [
         VOutputGenerator,
         VGeneratorOptions(
             conventions       = conventions,
-            filename          = '../../../output/vulkan_core.v',
+            #NOTE: Since the app working dir is in vulkandocs/scripts
+            filename          = '../../src/vulkan.v',
             directory         = directory,
             genpath           = None,
             apiname           = defaultAPIName,
@@ -1205,10 +1211,12 @@ if __name__ == '__main__':
     # Create the registry object with the specified generator and generator
     # options. The options are set before XML loading as they may affect it.
     reg = Registry(gen, options)
-
+	
+    # Modify path, because the current working directory inside this script was changed to vulkandocs/scripts
+    args_registry = '../../' + args.registry
     # Parse the specified registry XML into an ElementTree object
     startTimer(args.time)
-    tree = etree.parse(args.registry)
+    tree = etree.parse(args_registry)
     endTimer(args.time, '* Time to make ElementTree =')
 
     # Load the XML tree into the registry object

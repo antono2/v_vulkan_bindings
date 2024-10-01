@@ -546,11 +546,11 @@ REPLACEMENT_MAP = {{\n    {}\n}}".format(key_strings))
                     self.newline()
 
                     # Generate warning of possible use in IDEs
-                    write(f'// {self.featureName} is a preprocessor guard. Do not pass it to API calls.', file=self.outFile)
                     # NOTE Anton: Removing Vk... from variable names, as they are all in the vulkan name space already
                     self.featureName = self.removeVk(self.featureName)
-
-                    write('const', self.featureName, '=', '1', file=self.outFile)
+                    # NOTE Anton: This can be used for programmatically checking available extensions, once conditional compilation is used
+                    #write(f'// {self.featureName} is a preprocessor guard. Do not pass it to API calls.', file=self.outFile)
+                    #write('const', self.featureName, '=', '1', file=self.outFile)
                     for section in self.TYPE_SECTIONS:
                         contents = self.sections[section]
                         if contents:
