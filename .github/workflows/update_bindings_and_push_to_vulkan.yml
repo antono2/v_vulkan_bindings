@@ -1,5 +1,7 @@
 name: Update bindings and push to antono2/vulkan
 on:
+  schedule:
+    - cron: "0 6 * * *"   # run every day at 6:00 AM UTC
   workflow_dispatch:
 env:
   DEPLOY_TARGET_REPO: 'antono2/vulkan'
