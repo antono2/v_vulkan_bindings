@@ -1,0 +1,120 @@
+name: Tmp specific version gen and push to vulkan
+on:
+  workflow_dispatch:
+    inputs:
+      vk_docs_version:
+        description: 'The specific version of Vulkan, like v1.3.290'
+        required: true
+        type: string
+env:
+  DEPLOY_TARGET_REPO: 'antono2/vulkan'
+jobs:
+  check_for_new_release:
+    name: Check for new release of Vulkan-Docs
+    runs-on: ubuntu-latest
+    steps:
+    - name: Self checkout
+      uses: actions/checkout@v4
+    - id: getversions
+      run: |
+        echo "cur_release_version=$(cat VERSION)" >> $GITHUB_OUTPUT
+        echo "new_release_version=${{ inputs.vk_docs_version }}" >> $GITHUB_OUTPUT
+    - name: Check if EMPTY
+      if: ${{ steps.getversions.outputs.new_release_version == '' }}
+      uses: actions/github-script@v3
+      with:
+        script: |
+          core.setFailed('Could not get new_release_version from https://api.github.com/repos/KhronosGroup/Vulkan-Docs/tags')
+    - name: Check for new version
+      if: ${{ steps.getversions.outputs.cur_release_version == steps.getversions.outputs.new_release_version }}
+      uses: actions/github-script@v3
+      with:
+        script: |
+          core.setFailed('Version ${{ steps.getversions.outputs.cur_release_version }} already up to date with KhronosGroup/Vulkan-Docs.')
+    outputs:
+      cur_release_version: ${{ steps.getversions.outputs.cur_release_version }}
+      new_release_version: ${{ steps.getversions.outputs.new_release_version }}
+    
+  update_bindings_and_upload_artifact:
+    needs:
+      - check_for_new_release
+    name: Update Bindings, Version and Push to vulkan
+    runs-on: ubuntu-latest
+    steps:
+    - name: Self checkout
+      uses: actions/checkout@v4
+    - name: Checkout Vulkan-Docs
+      uses: actions/checkout@v4
+      with:
+        repository: KhronosGroup/Vulkan-Docs
+        path: vulkandocs
+        ref:  ${{ env.NEW_RELEASE_VERSION }}
+    - name: Setup Vlang
+      uses: prantlf/setup-v-action@v2.3.3
+    - name: Setup Python
+      uses: actions/setup-python@v5.2.0
+    - name: Generate bindings
+      run: |
+        python src/main.py -registry vulkandocs/xml/vk.xml vulkan.v
+    - name: v fmt -w src/vulkan.v
+      run: |
+        v fmt -w src/vulkan.v
+    - name: Upload generated bindings artifact
+      uses: actions/upload-artifact@v4
+      id: upload_v_vulkan_bindings_output
+      with:
+        name: v_vulkan_bindings_output
+        path: |
+          src/vulkan.v
+          VERSION
+        
+  download_artifact_and_deploy:
+    name: Download artifact and deploy
+    needs:
+      - check_for_new_release
+      - update_bindings_and_upload_artifact
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ env.DEPLOY_TARGET_REPO }}
+          ref: 'master'
+          token:  ${{ secrets.BINDINGS_OUTPUT_REPO_TOKEN }}
+      - name: Setup git config
+        run: |
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "<>"
+
+      - name: Download generated template
+        uses: actions/download-artifact@v4
+        with:
+          name: v_vulkan_bindings_output
+      
+      - name: Update VERSION, Commit and push generated bindings
+        run: |
+          echo "${{ needs.check_for_new_release.outputs.new_release_version }}" > VERSION
+          export COMMIT_MESSAGE="Generated bindings ${{ needs.check_for_new_release.outputs.new_release_version }}"
+          git add .
+          git commit -m "$COMMIT_MESSAGE"
+          git push
+          git tag "${{ needs.check_for_new_release.outputs.new_release_version }}" -m "V Vulkan Bindings for KhronosGroup/Vulkan-Docs ${{ needs.check_for_new_release.outputs.new_release_version }}"
+          git push origin "${{ needs.check_for_new_release.outputs.new_release_version }}"
+
+  update_version:
+    name: Update VERSION
+    needs:
+      - check_for_new_release
+      - update_bindings_and_upload_artifact
+      - download_artifact_and_deploy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup git config
+        run: |
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "<>"
+          echo "${{ needs.check_for_new_release.outputs.new_release_version }}" > VERSION
+          git add .
+          git commit -m "Updated VERSION to ${{ needs.check_for_new_release.outputs.new_release_version }}"
+          git push
+          
