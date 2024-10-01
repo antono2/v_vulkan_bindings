@@ -48,7 +48,7 @@ jobs:
       with:
         repository: KhronosGroup/Vulkan-Docs
         path: vulkandocs
-        ref:  ${{ env.NEW_RELEASE_VERSION }}
+        ref:  ${{ needs.check_for_new_release.outputs.new_release_version }}
     - name: Setup Vlang
       uses: prantlf/setup-v-action@v2.3.3
     - name: Setup Python
