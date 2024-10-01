@@ -1,4 +1,4 @@
-name: Tmp specific version gen and push to vulkan
+name: Specific version gen and push to vulkan
 on:
   workflow_dispatch:
     inputs:
