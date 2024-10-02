@@ -194,8 +194,12 @@ class VOutputGenerator(OutputGenerator):
     # - multiple upper case characters
     # - numbers in names
     # https://stackoverflow.com/questions/1175208/elegant-python-function-to-convert-camelcase-to-snake-case
-    #CAMEL_TO_SNAKE_CASE_REGEX = re.compile('((?<=[a-z0-9])[A-Z]|(?!^)[A-Z](?=[a-z]))')
-    CAMEL_TO_SNAKE_CASE_REGEX = re.compile('((?<=[a-z0-9])[A-Z0-9]|(?!^)[A-Z](?=[a-z]))')
+    CAMEL_TO_SNAKE_CASE_REGEX = re.compile('((?<=[a-z0-9])[A-Z]|(?!^)[A-Z](?=[a-z]))')
+#    CAMEL_TO_SNAKE_CASE_REGEX = re.compile('(\B)([A-Z]+)')
+
+#    CAMEL_TO_SNAKE_CASE_REGEX = re.compile('((?<=[a-z0-9])[A-Z0-9]|(?!^)[A-Z](?=[a-z]))')
+ #   CAMEL_TO_SNAKE_CASE_REGEX = re.compile('((?<=[a-z0-9])[A-Z0-9]|(?!^)[A-Z](?=[a-z]))')
+
     # correct    structure_type_surface_capabilities_2_ext
     # incorrect structure_type_surface_capabilities2_ext
 
@@ -1149,8 +1153,14 @@ REPLACEMENT_MAP = {{\n    {}\n}}".format(key_strings))
         return name,  alias
 
     def v_camel_to_snake_case(self, v_name) -> str:
-        return self.CAMEL_TO_SNAKE_CASE_REGEX.sub(r'_\1', v_name).lower()
+#        consecutive_nums =
+#        for nums in re.compile('[0-9]+').finditer():
+#
 
+#        ret = re.compile('((?<=[a-z0-9])[A-Z]|(?!^)[A-Z](?=[a-z]))').sub(r'_\1', v_name).lower()
+#        return ret
+#        return self.CAMEL_TO_SNAKE_CASE_REGEX.sub(r'_\1', v_name).lower()
+        return self.CAMEL_TO_SNAKE_CASE_REGEX.sub(r'_\1', v_name).lower()
 
     # Note Anton: the oiginal method comes from submodules/vulkandocs/scripts/generator.py
     def makeVParamDecl(self, typeName, param, aligncol, only_types=False, only_names=False):
@@ -1258,7 +1268,8 @@ REPLACEMENT_MAP = {{\n    {}\n}}".format(key_strings))
             if v_name == 's_type':
                 struct_type_enum = 'structure_type_' + self.v_camel_to_snake_case(typeName)
                 if struct_type_enum in self.STRUCTURE_TYPES:
-                    paramdecl = paramdecl + ' = StructureType.' + struct_type_enum
+                    pass
+                    #paramdecl = paramdecl + ' = StructureType.' + struct_type_enum
 
 #            if (self.misracppstyle() and prefix.find('const ') != -1):
 #                # Change pointer type order from e.g. "const void *" to "void const *".
