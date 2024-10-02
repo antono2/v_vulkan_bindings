@@ -194,7 +194,10 @@ class VOutputGenerator(OutputGenerator):
     # - multiple upper case characters
     # - numbers in names
     # https://stackoverflow.com/questions/1175208/elegant-python-function-to-convert-camelcase-to-snake-case
-    CAMEL_TO_SNAKE_CASE_REGEX = re.compile('((?<=[a-z0-9])[A-Z]|(?!^)[A-Z](?=[a-z]))')
+    #CAMEL_TO_SNAKE_CASE_REGEX = re.compile('((?<=[a-z0-9])[A-Z]|(?!^)[A-Z](?=[a-z]))')
+    CAMEL_TO_SNAKE_CASE_REGEX = re.compile('((?<=[a-z0-9])[A-Z0-9]|(?!^)[A-Z](?=[a-z]))')
+    # correct    structure_type_surface_capabilities_2_ext
+    # incorrect structure_type_surface_capabilities2_ext
 
     # There is an Enum StructureType in the vulkan registry.
     # Also, each struct has a field s_type containing this Enum.
