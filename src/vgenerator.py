@@ -196,6 +196,11 @@ class VOutputGenerator(OutputGenerator):
     # https://stackoverflow.com/questions/1175208/elegant-python-function-to-convert-camelcase-to-snake-case
     CAMEL_TO_SNAKE_CASE_REGEX = re.compile('((?<=[a-z0-9])[A-Z]|(?!^)[A-Z](?=[a-z]))')
 
+    # There is an Enum StructureType in the vulkan registry.
+    # Also, each struct has a field s_type containing this Enum.
+    # This array stores the possible Enum values and sets a default value for s_type, if possible
+    STRUCTURE_TYPES = []
+
     TYPE_MAP = {
         'size_t': 'usize',
         'void*': 'voidptr',
@@ -967,7 +972,7 @@ REPLACEMENT_MAP = {{\n    {}\n}}".format(key_strings))
             body += 'pub mut:\n'
             for member in typeElem.findall('.//member'):
                 body += self.deprecationComment(member, indent = 4)
-                body += self.makeVParamDecl(member, targetLen + 4)
+                body += self.makeVParamDecl(typeName, member, targetLen + 4)
                 body += '\n'
             body += '}\n'
             if protect_end:
@@ -1079,6 +1084,9 @@ REPLACEMENT_MAP = {{\n    {}\n}}".format(key_strings))
         else:
             body = 'pub const ' + v_name.ljust(33) + ' = ' + prefix + v_type.strip() + "(" + v_value + ")"
 
+        if "StructureType" in v_name:
+            x =123
+
         return body
 
     def genCmd(self, cmdinfo, name, alias):
@@ -1142,7 +1150,7 @@ REPLACEMENT_MAP = {{\n    {}\n}}".format(key_strings))
 
 
     # Note Anton: the oiginal method comes from submodules/vulkandocs/scripts/generator.py
-    def makeVParamDecl(self, param, aligncol, only_types=False, only_names=False):
+    def makeVParamDecl(self, typeName, param, aligncol, only_types=False, only_names=False):
         """Return a string which is an indented, formatted
         declaration for a `<param>` or `<member>` block (e.g. function parameter
         or structure/union member).
@@ -1202,7 +1210,6 @@ REPLACEMENT_MAP = {{\n    {}\n}}".format(key_strings))
                 # NOTE Anton: Removing Vk... from variable names, as they are all in the vulkan name space already
                 v_name = self.removeVk(v_name)
 
-
             if self.should_insert_may_alias_macro and self.genOpts.conventions.is_voidpointer_alias(elem.tag, text, tail):
                 # OpenXR-specific macro insertion - but not in apiinc for the spec
                 tail = self.genOpts.conventions.make_voidpointer_alias(tail)
@@ -1244,6 +1251,11 @@ REPLACEMENT_MAP = {{\n    {}\n}}".format(key_strings))
                 paramdecl = indent + v_name
             else:
                 paramdecl = indent + v_name.ljust(aligncol - 1) + ' ' + v_type
+            # For each item also check if its s_type and can get a default value for StructureType
+            if v_name == 's_type':
+                struct_type_enum = 'structure_type_' + self.v_camel_to_snake_case(typeName)
+                if struct_type_enum in self.STRUCTURE_TYPES:
+                    paramdecl = paramdecl + ' = StructureType.' + struct_type_enum
 
 #            if (self.misracppstyle() and prefix.find('const ') != -1):
 #                # Change pointer type order from e.g. "const void *" to "void const *".
@@ -1520,22 +1532,20 @@ REPLACEMENT_MAP = {{\n    {}\n}}".format(key_strings))
             # Extension enumerants are only included if they are required
             if self.isEnumRequired(elem):
                 decl = ''
-
                 protect = elem.get('protect')
                 if protect is not None:
                     #TODO: remove continue and implement conditional compilation
                     continue
                     decl += '#ifdef {}\n'.format(protect)
 
-
                 decl += self.genRequirements(name, mustBeFound = False, indent = 2)
                 decl += self.deprecationComment(elem, indent = 2)
 #                decl += '    {} = {},'.format(name, strVal)
                 decl += '    {} = int({})'.format(name, strVal)
-
+                if groupName == 'StructureType':
+                    self.STRUCTURE_TYPES.append(name)
                 if protect is not None:
                     decl += '\n#endif'
-
                 if numVal is not None:
                     body.append(decl)
                 else:
@@ -1668,7 +1678,7 @@ REPLACEMENT_MAP = {{\n    {}\n}}".format(key_strings))
         # Indented parameters
         if n > 0:
             indentdecl = '(\n'
-            indentdecl += ',\n'.join(self.makeVParamDecl(p, self.genOpts.alignFuncParam, True, False)
+            indentdecl += ',\n'.join(self.makeVParamDecl(v_name, p, self.genOpts.alignFuncParam, True, False)
                                      for p in params)
             indentdecl += ')'
         else:
@@ -1683,11 +1693,11 @@ REPLACEMENT_MAP = {{\n    {}\n}}".format(key_strings))
         #NOTE: C function type definition
         if n > 0:
             v_function_params = '(\n'
-            v_function_params += ',\n'.join(self.makeVParamDecl(p, self.genOpts.alignFuncParam, False,  False)
+            v_function_params += ',\n'.join(self.makeVParamDecl(v_name, p, self.genOpts.alignFuncParam, False,  False)
                                         for p in params)
             v_function_params += ')'
             v_function_param_names = '(\n'
-            v_function_param_names += ',\n'.join(self.makeVParamDecl(p, self.genOpts.alignFuncParam, False, True)
+            v_function_param_names += ',\n'.join(self.makeVParamDecl(v_name, p, self.genOpts.alignFuncParam, False, True)
                                             for p in params)
             v_function_param_names += ')'
         else:
