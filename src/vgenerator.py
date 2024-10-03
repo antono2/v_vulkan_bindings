@@ -207,6 +207,9 @@ class VOutputGenerator(OutputGenerator):
     # Also, each struct has a field s_type containing this Enum.
     # This array stores the possible Enum values and sets a default value for s_type, if possible
     STRUCTURE_TYPES = []
+#    STRUCTURE_TYPES_NUMBER_WITH_UNDERSCORE_REGEX = re.compile('\w(_)\d+')
+    STRUCTURE_TYPES_NUMBER_WITH_UNDERSCORE_REGEX = re.compile('(?<=[A-Z])_(?P<num_after_underscore>[0-9])')
+
 
     TYPE_MAP = {
         'size_t': 'usize',
@@ -1266,10 +1269,9 @@ REPLACEMENT_MAP = {{\n    {}\n}}".format(key_strings))
                 paramdecl = indent + v_name.ljust(aligncol - 1) + ' ' + v_type
             # For each item also check if its s_type and can get a default value for StructureType
             if v_name == 's_type':
-                struct_type_enum = 'structure_type_' + self.v_camel_to_snake_case(typeName)
+                struct_type_enum = 'structure_type_' + self.v_camel_to_snake_case(typeName).lower()
                 if struct_type_enum in self.STRUCTURE_TYPES:
-                    pass
-                    #paramdecl = paramdecl + ' = StructureType.' + struct_type_enum
+                    paramdecl = paramdecl + ' = StructureType.' + struct_type_enum
 
 #            if (self.misracppstyle() and prefix.find('const ') != -1):
 #                # Change pointer type order from e.g. "const void *" to "void const *".
@@ -1540,6 +1542,16 @@ REPLACEMENT_MAP = {{\n    {}\n}}".format(key_strings))
             # Should catch exceptions here for more complex constructs. Not yet.
             (numVal, strVal) = self.enumToValue(elem, True)
             name = elem.get('name')
+
+            # Handle StructureType Enum customly to set a default s_type in structs later
+            # AAAA_2323_AAAA -> AAAA2323_AAAA
+            # VK_STRUCTURE_TYPE_SURFACE_CAPABILITIES_2_EXT -> VK_STRUCTURE_TYPE_SURFACE_CAPABILITIES2_EXT
+            # Matching s_type = structure_type_surface_capabilities2_ext
+            # To fix an issue, where the default s_type enum doesn't match the StructureType enum
+            # replace '_2' with '2'
+            name = self.STRUCTURE_TYPES_NUMBER_WITH_UNDERSCORE_REGEX.sub(r'\g<num_after_underscore>', name)
+
+
             # NOTE Anton: Removing Vk... from variable names, as they are all in the vulkan name space already
             # NOTE Anton: V doesn't allow for upper case enum member names
             name = self.removeVk(name).lower()
@@ -1556,6 +1568,7 @@ REPLACEMENT_MAP = {{\n    {}\n}}".format(key_strings))
                 decl += self.deprecationComment(elem, indent = 2)
 #                decl += '    {} = {},'.format(name, strVal)
                 decl += '    {} = int({})'.format(name, strVal)
+                # Append all items in StructureType struct. Later used to set default s_type if found in STRUCTURE_TYPES
                 if groupName == 'StructureType':
                     self.STRUCTURE_TYPES.append(name)
                 if protect is not None:
