@@ -1427,7 +1427,8 @@ REPLACEMENT_MAP = {{\n    {}\n}}".format(key_strings))
             if self.isEnumRequired(elem):
                 protect = elem.get('protect')
                 if protect is not None:
-                    body += '#ifdef {}\n'.format(protect)
+                    pass
+#                    body += '#ifdef {}\n'.format(protect)
 
                 body += self.deprecationComment(elem, indent = 0)
                 # usedefine = False, self.misracstyle() = False
@@ -1472,7 +1473,8 @@ REPLACEMENT_MAP = {{\n    {}\n}}".format(key_strings))
                     aliasText += decl
 
                 if protect is not None:
-                    body += '#endif\n'
+                    pass
+#                    body += '#endif\n'
 
         # Now append the non-numeric enumerant values
         body += aliasText
