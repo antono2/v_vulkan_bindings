@@ -351,6 +351,14 @@ class VOutputGenerator(OutputGenerator):
 #       NOTE Anton: This is replaced in genType with a hard coded search string
 #        '// Version of this file\n#define VK_HEADER_VERSION 295\n':
 #        'pub const header_version = ',
+        '// Complete version of this file\n#define VK_HEADER_VERSION_COMPLETE VK_MAKE_API_VERSION(0, 1, 9, VK_HEADER_VERSION)\n':
+        'pub const header_version_complete = make_api_version(0, 1, 9, header_version)',
+        '// Complete version of this file\n#define VK_HEADER_VERSION_COMPLETE VK_MAKE_API_VERSION(0, 1, 8, VK_HEADER_VERSION)\n':
+        'pub const header_version_complete = make_api_version(0, 1, 8, header_version)',
+        '// Complete version of this file\n#define VK_HEADER_VERSION_COMPLETE VK_MAKE_API_VERSION(0, 1, 7, VK_HEADER_VERSION)\n':
+        'pub const header_version_complete = make_api_version(0, 1, 7, header_version)',
+        '// Complete version of this file\n#define VK_HEADER_VERSION_COMPLETE VK_MAKE_API_VERSION(0, 1, 6, VK_HEADER_VERSION)\n':
+        'pub const header_version_complete = make_api_version(0, 1, 6, header_version)',
         '// Complete version of this file\n#define VK_HEADER_VERSION_COMPLETE VK_MAKE_API_VERSION(0, 1, 5, VK_HEADER_VERSION)\n':
         'pub const header_version_complete = make_api_version(0, 1, 5, header_version)',
         '// Complete version of this file\n#define VK_HEADER_VERSION_COMPLETE VK_MAKE_API_VERSION(0, 1, 4, VK_HEADER_VERSION)\n':
@@ -365,10 +373,18 @@ class VOutputGenerator(OutputGenerator):
         'pub fn api_version_minor(version u32) u32 {\n  return version >> 12 & u32(0x3FF)\n}',
         '#define VK_API_VERSION_PATCH(version) ((uint32_t)(version) & 0xFFFU)':
         'pub fn api_version_patch(version u32) u32 {\n  return version & u32(0xFFF)\n}',
-        '// Vulkan 1.3 version number\n#define VK_API_VERSION_1_5 VK_MAKE_API_VERSION(0, 1, 5, 0)// Patch version should always be set to 0\n':
-        '// Vulkan 1.3 version number\npub const api_version_1_5 = make_api_version(0, 1, 5, 0)// Patch version should always be set to 0\n',
-        '// Vulkan 1.3 version number\n#define VK_API_VERSION_1_4 VK_MAKE_API_VERSION(0, 1, 4, 0)// Patch version should always be set to 0\n':
-        '// Vulkan 1.3 version number\npub const api_version_1_4 = make_api_version(0, 1, 4, 0)// Patch version should always be set to 0\n',
+        '// Vulkan 1.9 version number\n#define VK_API_VERSION_1_9 VK_MAKE_API_VERSION(0, 1, 9, 0)// Patch version should always be set to 0\n':
+        '// Vulkan 1.9 version number\npub const api_version_1_9 = make_api_version(0, 1, 5, 0)// Patch version should always be set to 0\n',
+        '// Vulkan 1.8 version number\n#define VK_API_VERSION_1_8 VK_MAKE_API_VERSION(0, 1, 8, 0)// Patch version should always be set to 0\n':
+        '// Vulkan 1.8 version number\npub const api_version_1_8 = make_api_version(0, 1, 8, 0)// Patch version should always be set to 0\n',
+        '// Vulkan 1.7 version number\n#define VK_API_VERSION_1_7 VK_MAKE_API_VERSION(0, 1, 7, 0)// Patch version should always be set to 0\n':
+        '// Vulkan 1.7 version number\npub const api_version_1_7 = make_api_version(0, 1, 7, 0)// Patch version should always be set to 0\n',
+        '// Vulkan 1.6 version number\n#define VK_API_VERSION_1_6 VK_MAKE_API_VERSION(0, 1, 6, 0)// Patch version should always be set to 0\n':
+        '// Vulkan 1.6 version number\npub const api_version_1_6 = make_api_version(0, 1, 6, 0)// Patch version should always be set to 0\n',
+        '// Vulkan 1.5 version number\n#define VK_API_VERSION_1_5 VK_MAKE_API_VERSION(0, 1, 5, 0)// Patch version should always be set to 0\n':
+        '// Vulkan 1.5 version number\npub const api_version_1_5 = make_api_version(0, 1, 5, 0)// Patch version should always be set to 0\n',
+        '// Vulkan 1.4 version number\n#define VK_API_VERSION_1_4 VK_MAKE_API_VERSION(0, 1, 4, 0)// Patch version should always be set to 0\n':
+        '// Vulkan 1.4 version number\npub const api_version_1_4 = make_api_version(0, 1, 4, 0)// Patch version should always be set to 0\n',
         '// Vulkan 1.3 version number\n#define VK_API_VERSION_1_3 VK_MAKE_API_VERSION(0, 1, 3, 0)// Patch version should always be set to 0\n':
         '// Vulkan 1.3 version number\npub const api_version_1_3 = make_api_version(0, 1, 3, 0)// Patch version should always be set to 0\n',
         '// Vulkan 1.2 version number\n#define VK_API_VERSION_1_2 VK_MAKE_API_VERSION(0, 1, 2, 0)// Patch version should always be set to 0\n':
