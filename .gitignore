@@ -22,4 +22,5 @@ env/
 vulkandocs/
 *.md.backup
 src/vulkan.v
-
+src/vulkan_video.v
+REPLACEMENT_MAP.txt
