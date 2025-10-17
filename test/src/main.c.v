@@ -1,5 +1,5 @@
 /*
-  Creates a Vulkan Instance. Currently just to check if the generator gave valid V code.
+  Creates a Vulkan Instance.
   v -cc gcc run test
 */
 
