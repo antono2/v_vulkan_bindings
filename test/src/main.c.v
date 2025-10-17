@@ -17,13 +17,6 @@ import vulkan as vk
 #flag windows -L$env('VULKAN_SDK')/Lib
 #flag windows -I$env('VULKAN_SDK')/Include/Volk
 
-
-// Github workflow. Note, there is no x86_64 directory
-// INSTALL_PATH="/home/runner/work/tmp_v_vulkan_bindings/tmp_v_vulkan_bindings"
-// SDK_INSTALL_PATH="$INSTALL_PATH/VulkanSDK/1.4.309.0"
-// VK_LAYER_PATH=$SDK_INSTALL_PATH/share/vulkan/explicit_layer.d"
-
-
 //#include "vulkan.h"
 #define VOLK_IMPLEMENTATION
 
@@ -68,7 +61,7 @@ fn main() {
 		pApplicationInfo:           &vk.ApplicationInfo{
 			sType:              vk.StructureType.application_info
 			pNext:              unsafe { nil }
-			pApplicationName:   c'Vulkan in Vlang'
+			pApplicationName:   c'Vulkan in V'
 			applicationVersion: 1
 			pEngineName:        c'Not an Engine'
 			engineVersion:      1
@@ -80,9 +73,6 @@ fn main() {
 		enabledExtensionCount:    0
 	}
 	create_instance_result := vk.create_instance(&create_info, unsafe{ nil }, &app.vk_instance)
-	dump(create_instance_result)
-	// Note: You can use string_VkResult in /usr/include/vulkan/generated/vk_enum_string_helper.h
-	// otherwise the string value of ${result} will just be the enum name, eg. 'success'
 	if create_instance_result != vk.Result.success {
 		println('Could not create vulkan instance. VkResult: ${create_instance_result}')
 		panic("Test create vulkan instance failed.")
