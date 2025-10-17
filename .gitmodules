@@ -1,3 +1,0 @@
-[submodule "submodules/vulkandocs"]
-	path = submodules/vulkandocs
-	url = git@github.com:KhronosGroup/Vulkan-Docs.git

@@ -1,7 +1,5 @@
-name: Update bindings and push to antono2/vulkan
+name: Update bindings and push to vulkan
 on:
-  schedule:
-    - cron: "0 6 * * *"   # run every day at 6:00 AM UTC
   workflow_dispatch:
 env:
   DEPLOY_TARGET_REPO: 'antono2/vulkan'
@@ -45,17 +43,40 @@ jobs:
       with:
         repository: KhronosGroup/Vulkan-Docs
         path: vulkandocs
-        ref:  ${{ env.NEW_RELEASE_VERSION }}
+        ref:  ${{ needs.check_for_new_release.outputs.new_release_version }}
     - name: Setup Vlang
       uses: prantlf/setup-v-action@v2.3.3
     - name: Setup Python
       uses: actions/setup-python@v5.2.0
-    - name: Generate bindings
+    - name: Generate bindings vulkan.v
       run: |
         python src/main.py -registry vulkandocs/xml/vk.xml vulkan.v
+    - name: Generate bindings vulkan_video.v
+      run: |
+        python src/main.py -registry vulkandocs/xml/video.xml vulkan_video.v
     - name: v fmt -w src/vulkan.v
       run: |
         v fmt -w src/vulkan.v
+    - name: v fmt -w src/vulkan_video.v
+      run: |
+        v fmt -w src/vulkan_video.v
+
+    - name: Get version without v
+      # Without v prefix, just the number
+      id: get_version_without_v
+      run: echo "version=$(echo "${{ needs.check_for_new_release.outputs.new_release_version }}" | sed 's/v//')" >> $GITHUB_OUTPUT
+    - name: VulkanCI
+      uses: NcStudios/VulkanCI@v1.2
+      with:
+        # sdkVersion: ${{ steps.get_version_without_v.outputs.version }}
+        # 1.4.309.0 is the newest supported as of 14.10.2025
+        sdkVersion: 1.4.309.0
+    - name: Volk Download
+      id: download_volk
+      run: wget https://raw.githubusercontent.com/zeux/volk/refs/heads/master/volk.h -P "$VULKAN_SDK/include/volk" && wget https://raw.githubusercontent.com/zeux/volk/refs/heads/master/volk.c -P "$VULKAN_SDK/include/volk" && ls "$VULKAN_SDK/include/volk"
+    - name: Test
+      run: v -cc gcc run test
+
     - name: Upload generated bindings artifact
       uses: actions/upload-artifact@v4
       id: upload_v_vulkan_bindings_output
@@ -63,8 +84,9 @@ jobs:
         name: v_vulkan_bindings_output
         path: |
           src/vulkan.v
+          src/vulkan_video.v
           VERSION
-        
+  
   download_artifact_and_deploy:
     name: Download artifact and deploy
     needs:
@@ -72,11 +94,11 @@ jobs:
       - update_bindings_and_upload_artifact
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           repository: ${{ env.DEPLOY_TARGET_REPO }}
           ref: 'master'
-          token:  ${{ secrets.BINDINGS_OUTPUT_REPO_TOKEN }}
+          token:  ${{ secrets.PUSH_VULKAN }}
       - name: Setup git config
         run: |
           git config --global user.name "GitHub Actions"
@@ -103,10 +125,16 @@ jobs:
       - check_for_new_release
       - update_bindings_and_upload_artifact
       - download_artifact_and_deploy
+    #permissions:
+    #  contents: write
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - name: Setup git config
+      # Clone v_vulkan_bindings, which is the repo this workflow is running on
+      - uses: actions/checkout@v5
+        with:
+          ref: 'master'
+          token:  ${{ secrets.PUSH_VULKAN }}
+      - name: Update Version
         run: |
           git config --global user.name "GitHub Actions"
           git config --global user.email "<>"

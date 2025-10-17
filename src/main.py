@@ -1,30 +1,51 @@
-import sys,  os
-import pathlib
-scriptPath = str(pathlib.Path(__file__).parent.resolve())
-vkScriptPath = scriptPath + '/../vulkandocs/scripts'
-#sys.path.append('submodules/vulkandocs/scripts')
-sys.path.append(vkScriptPath)
-#scriptPath = os.path.realpath(os.path.dirname(sys.argv[0]))
-#os.chdir(scriptPath + '/../submodules/vulkandocs/scripts')
-#os.chdir('submodules/vulkandocs/scripts')
-
 #!/usr/bin/env python3
 #
 # Copyright 2013-2024 The Khronos Group Inc.
 #
 # SPDX-License-Identifier: Apache-2.0
 
+# For vulkan.v and vulkan_video.v
+# MIT License
+#
+# Copyright Anton Oreskin | https://gosudev.de
+#
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
+import sys,  os
+import pathlib
 import argparse
 import pdb
 import re
-import copy
 import time
 import xml.etree.ElementTree as etree
+
+scriptPath = str(pathlib.Path(__file__).parent.resolve())
+# NOTE: It is required to set the current working directory,
+# as import paths are relative to cwd and vulkandocs needs to be replaceable
+vkScriptPath = scriptPath + '/../vulkandocs/scripts'
+sys.path.append(vkScriptPath)
 
 os.chdir(vkScriptPath)
 from cgenerator import CGeneratorOptions, COutputGenerator
 from vgenerator import VGeneratorOptions, VOutputGenerator
-from reflib import logDiag, logWarn, logErr, setLogFile
+from reflib import logDiag, logErr, setLogFile
 from reg import Registry
 from apiconventions import APIConventions
 
@@ -115,24 +136,21 @@ def makeGenOpts(args):
     # Copyright text prefixing all headers (list of strings).
     # The SPDX formatting below works around constraints of the 'reuse' tool
     prefixStrings = [
-        '/*',
-        '** Creator antono2@github.com.',
-        '**',
-        '** License' + ': Public Domain',
-        '*/',
-        ''
+#        '/*',
+#        '*/',
+#        '', 
     ]
     vkPrefixStrings = [
-        '/*',
-        '** This module is generated from the Khronos Vulkan XML API Registry.',
-        '**',
-        '*/',
-        '',
-        '',
+#        '/*',
+#        '** This module is generated from the Khronos Vulkan XML API Registry.',
+#        '**',
+#        '*/',
+#        '',
+#        '',
         #'#flag linux -L/usr/lib/x86_64-linux-gnu',
 #        "#flag linux -I$env('VULKAN_SDK')/x86_64/include",
 #        "#flag linux -I$env('VULKAN_SDK')/x86_64/include/vulkan",
-#        #NOTE Anton: TODO Vlang does not allow double quotes ("") as $env parameter
+#        #NOTE Anton: TODO V does not allow double quotes ("") as $env parameter
 #        "#flag linux -L$env('VULKAN_SDK')/x86_64/lib",
 #        '#flag linux -lVkLayer_core_validation',
 #        '#flag linux -lVkLayer_object_lifetimes',
@@ -153,7 +171,7 @@ def makeGenOpts(args):
 #        '#flag linux -lvulkan',
 #        '#flag linux -lvolk',
 #        '#flag -Iinclude',
-        '',
+#        '',
 #        '#include "vulkan/vulkan.h"',
 #        '#include "vk_video/vulkan_video_codec_av1std_decode.h"',
 #        '#include "vk_video/vulkan_video_codec_av1std.h"',
@@ -608,7 +626,7 @@ def makeGenOpts(args):
         VOutputGenerator,
         VGeneratorOptions(
             conventions       = conventions,
-            #NOTE: Since the app working dir is in vulkandocs/scripts
+            #NOTE Anton: The generator working dir is in vulkandocs/scripts, because it changes directory itself
             filename          = '../../src/vulkan.v',
             directory         = directory,
             genpath           = None,
@@ -627,7 +645,7 @@ def makeGenOpts(args):
             # V does not need them
             genFuncPointers   = False,
             protectFile       = protectFile,
-# TODO: add protection strings conditional compilation is supported
+# TODO: add protection strings once conditional compilation is supported
 # https://github.com/vlang/v/issues/20420 is resolved
 #            protectFeature    = False,
 #            protectProto      = '#ifndef',
@@ -635,7 +653,6 @@ def makeGenOpts(args):
 #            apicall           = 'VKAPI_ATTR ',
 #            apientry          = 'VKAPI_CALL ',
 #            apientryp         = 'VKAPI_PTR *',
-            #NOTE Anton: changed to True; did not produce VK_NO_PROTOTYPES in output
             protectFeature    = False,
             protectProto      = '',
             protectProtoStr   = 'VK_NO_PROTOTYPES',
@@ -645,13 +662,38 @@ def makeGenOpts(args):
             alignFuncParam    = 48,
             misracstyle       = misracstyle,
             misracppstyle     = misracppstyle,
-            #NOTE Anton: added for testing
-            # protectExtensionProto and protectExtensionProtoStr are strings
-            # they surround extensions a whole group
-#            protectExtensionProto = True,
-#            protectExtensionProtoStr = 'abcd',
             )
         ]
+
+    genOpts['vulkan_video.v'] = [
+          VOutputGenerator,
+          VGeneratorOptions(
+            conventions       = conventions,
+            filename          = '../../src/vulkan_video.v',
+            directory         = directory,
+            genpath           = None,
+            apiname           = 'vulkan_video',
+            profile           = None,
+            versions          = None,
+            emitversions      = None,
+            defaultExtensions = defaultExtensions,
+            addExtensions     = addExtensionsPat,
+            removeExtensions  = removeExtensionsPat,
+            emitExtensions    = emitExtensionsPat,
+            prefixText        = prefixStrings + vkPrefixStrings,
+            #NOTE: if you see multiple lines with just 'Result\n\Result...', caused buy genFuncPointers = True
+            genFuncPointers   = False,
+            protectFile       = protectFile,
+            protectFeature    = False,
+            protectProto      = '',
+            protectProtoStr   = 'VK_NO_PROTOTYPES',
+            apicall           = '',
+            apientry          = '',
+            apientryp         = '& ',
+            alignFuncParam    = 48,
+            misracstyle       = misracstyle,
+            misracppstyle     = misracppstyle)
+    ]
 
     # Vulkan versions to include for SC header - SC *removes* features from 1.0/1.1/1.2
     scVersions = makeREstring(['VK_VERSION_1_0', 'VK_VERSION_1_1', 'VK_VERSION_1_2', 'VKSC_VERSION_1_0'])

@@ -20,6 +20,3 @@ venv/
 env/
 .env/
 vulkandocs/
-*.md.backup
-src/vulkan.v
-
