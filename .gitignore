@@ -20,3 +20,6 @@ venv/
 env/
 .env/
 vulkandocs/
+REPLACEMENT_MAP.txt
+v_vulkan_bindings.epj
+
