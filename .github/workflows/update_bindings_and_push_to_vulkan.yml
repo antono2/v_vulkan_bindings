@@ -127,8 +127,6 @@ jobs:
       - check_for_new_release
       - update_bindings_and_upload_artifact
       - download_artifact_and_deploy
-    #permissions:
-    #  contents: write
     runs-on: ubuntu-latest
     steps:
       # Clone v_vulkan_bindings, which is the repo this workflow is running on
