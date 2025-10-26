@@ -1781,7 +1781,7 @@ REPLACEMENT_MAP = {{\n    {}\n}}".format(key_strings))
         # Add PFN_func type defintion for each vk function.
         # These are not part of vulkan, but of the bindings for V
         if v_type == 'PFN_vkVoidFunction':
-            v_wrapper += 'pub type PFN_{} = fn{}\n'.format(v_name_original,  v_pub_type_pfn_param_names) 
+            v_wrapper += 'pub type PFN_{} = fn{} voidptr\n'.format(v_name_original,  v_pub_type_pfn_param_names) 
         else:
             v_wrapper += 'pub type PFN_{} = fn{} {}\n'.format(v_name_original,  v_pub_type_pfn_param_names,  v_type) 
 
