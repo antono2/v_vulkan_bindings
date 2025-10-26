@@ -713,12 +713,21 @@ REPLACEMENT_MAP = {{\n    {}\n}}".format(key_strings))
                             else:
                                 v_params[len(v_params) - 1] = (v_name, last_tuple[1])
                         else:
-                            v_params.append((v_name, ''))
+                            # Something like
+                            # pub type PFN_vkDebugReportCallbackEXT = fn (...) Bool32
+                            # Get return type from "typedef VkBool32 (VKAPI_PTR *"
+                            if typeElem.text is not None and ' (VKAPI_PTR *' in typeElem.text:
+                                v_pfn_ret = typeElem.text.replace('typedef ','').replace(' (VKAPI_PTR *', '')
+                                v_pfn_ret = self.removeVk(v_pfn_ret)
+                                if v_pfn_ret in self.TYPE_MAP:
+                                    v_pfn_ret = self.TYPE_MAP[v_pfn_ret]
+                                v_params.append((v_name, v_pfn_ret))
+                            else:
+                                v_params.append((v_name, ''))
                         v_text = 'type'
                     if category == 'define' and self.misracppstyle():
                         body = body.replace("(uint32_t)", "static_cast<uint32_t>")
                     else:
-                        # NOTE: Never reached
                         v_value = noneStr(elem.text) + noneStr(elem.tail).replace(';', '')
                         v_text = 'type'
             v_type = self.removeVk(v_type)
@@ -740,7 +749,7 @@ REPLACEMENT_MAP = {{\n    {}\n}}".format(key_strings))
                     if is_first_iteration:
                         is_first_iteration = False
                         continue
-                    v_params_str += '\n  {},'.format( param[1])
+                    v_params_str += '\n {} {},'.format(param[0], param[1])
                 # Remove tailing ','
                 v_params_str = v_params_str[:-1]
                 body = 'pub type {} = fn ({}) {}'.format(v_name, v_params_str, v_params[0][1])
@@ -1825,10 +1834,7 @@ REPLACEMENT_MAP = {{\n    {}\n}}".format(key_strings))
             v_function_param_names = ()
 
 
-        #TODO: Add error code comment?
         #NOTE: V function with VK_NO_PROTOTYPES conditional compilation
-#        if self.genOpts.protectProto:
-#            v_wrapper += '@[if ' + self.genOpts.protectProtoStr + ' ?]\n'
         #NOTE: PFN_vkVoidFunction is defined as `voidptr` - pointer to a function - and has to be cast to the correct `PFN_...` by the user
         #Here handle the case where a function return type is PFN_vkVoidFunction
         if v_type == 'PFN_vkVoidFunction':
