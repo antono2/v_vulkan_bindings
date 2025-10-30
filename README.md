@@ -1,5 +1,5 @@
 # v_vulkan_bindings
-Generates the vulkan bindings for [V](https://vlang.io/) from the current [KhronosGroup](https://github.com/KhronosGroup/) [API description](https://github.com/KhronosGroup/Vulkan-Docs/blob/main/xml/vk.xml).
+Generates the [vulkan bindings](https://github.com/antono2/vulkan) for [V](https://vlang.io/) from the current [KhronosGroup](https://github.com/KhronosGroup/) [API description](https://github.com/KhronosGroup/Vulkan-Docs/blob/main/xml/vk.xml).
 
 ## run
 ```bash
