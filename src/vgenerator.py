@@ -437,9 +437,6 @@ SOFTWARE.
                     self.newline()
 
                     self.featureName = self.removeVk(self.featureName)
-                    # NOTE Anton: This can be used for programmatically checking available extensions, once conditional compilation is used
-                    #write(f'// {self.featureName} is a preprocessor guard. Do not pass it to API calls.', file=self.outFile)
-                    #write('const', self.featureName, '=', '1', file=self.outFile)
                     for section in self.TYPE_SECTIONS:
                         contents = self.sections[section]
                         if contents:
@@ -1736,9 +1733,9 @@ SOFTWARE.
                 decl = ''
                 protect = elem.get('protect')
                 if protect is not None:
-                    #TODO: remove continue and implement conditional compilation, once available, on root level in V code
+                    # Omit platform-specific enumerants whose supporting types
+                    # are not part of the portable generated module.
                     continue
-                    decl += '#ifdef {}\n'.format(protect)
 
                 decl += self.genRequirements(name, mustBeFound = False, indent = 2)
                 decl += self.deprecationComment(elem, indent = 2)
@@ -1749,8 +1746,6 @@ SOFTWARE.
                 # Append all items in StructureType struct. Later used to set default sType if found in STRUCTURE_TYPES
                 if groupName == 'StructureType':
                     self.STRUCTURE_TYPES.append(name)
-                if protect is not None:
-                    decl += '\n#endif'
                 decl += '\n'
                 if numVal is not None:
                     body.append(decl)
@@ -1958,79 +1953,25 @@ SOFTWARE.
             v_function_params_cast_base = '()'
             v_function_param_names = ()
 
-        #NOTE: V function with VK_NO_PROTOTYPES conditional compilation
-        #NOTE: PFN_vkVoidFunction is defined as `voidptr` - pointer to a function - and has to be cast to the correct `PFN_...` by the user
-        #Here handle the case where a function return type is PFN_vkVoidFunction
+        # PFN_vkVoidFunction is a function pointer and callers cast it to the
+        # appropriate PFN type returned by the Vulkan loader.
         if v_type == 'PFN_vkVoidFunction':
             v_type = 'voidptr'
         # Append V function params
         v_wrapper += v_function_param_names_and_types + v_type + " {\n"
         v_type_stripped = v_type.strip()
 
-        is_protected, extension_names = self.getFeatureConditionalCompilation(v_name_original)
-        #TODO remove is_protected = False or remove the if branch in case the conditional compilation isn't needed
-        is_protected = False
-        if is_protected:
-            if len(extension_names) > 1:
-                v_wrapper += '//$if {} ?{{\n'.format(' && '.join(extension_names))
-                v_wrapper += '$if {} ?{{\n'.format(extension_names[len(extension_names)-1])
-            else:
-                v_wrapper += '$if {} ?{{\n'.format(' && '.join(extension_names))
+        # Extension availability is determined at runtime by the loader and
+        # device; generated V wrappers do not require compile-time flags.
+        if v_type_stripped == '': # has no return type
+            v_wrapper += '    C.' + v_name_original + v_function_param_names
+        elif v_type_stripped == 'Result': # vk.Result return type
+            v_wrapper += '    return C.' + v_name_original + v_function_param_names
+        else: # has any other return type
+            v_wrapper += '    return C.' + v_name_original + v_function_param_names
 
-            if v_type_stripped == '':
-                v_wrapper += '    C.' + v_name_original + '{}'.format(' '.join(v_function_param_names.split('\n')))
-            elif v_type_stripped == 'Result':
-                v_wrapper += '    return C.' + v_name_original + '{}'.format(' '.join(v_function_param_names.split('\n')))
-            else:
-                v_wrapper += '    return C.' + v_name_original + '{}'.format(' '.join(v_function_param_names.split('\n')))
-            v_wrapper += '} $else {'
-            if v_type_stripped == '':
-                v_wrapper += '    //NOTE: Please check for 0 in case {} compiler flag was not passed.\n'.format(extension_names[len(extension_names)-1])
-                v_wrapper += '    return'
-            elif v_type_stripped == 'Result':
-                v_wrapper += '    return Result.error_extension_not_present'
-            else:
-                v_wrapper += '    //NOTE: Please check for 0 in case {} compiler flag was not passed.\n'.format(extension_names[len(extension_names)-1])
-                v_wrapper += '    return ' + v_type + '(0)'
-            v_wrapper += '\n}}\n'
-            return ['fn C.' + v_name_original + c_func_def_params + ' ' + v_type + '\n' + v_wrapper, tdecl]
-        else:
-            # C call inside V function
-            if v_type_stripped == '': # has no return type
-                #v_wrapper += '    C.' + v_name_original + '{}'.format(' '.join(v_function_param_names.split('\n')))
-                v_wrapper += '    C.' + v_name_original + v_function_param_names
-            elif v_type_stripped == 'Result': # vk.Result return type
-                #v_wrapper += '    return C.' + v_name_original + '{}'.format(' '.join(v_function_param_names.split('\n')))
-                v_wrapper += '    return C.' + v_name_original + v_function_param_names
-            else: # has any other return type
-                #v_wrapper += '    return C.' + v_name_original + '{}'.format(' '.join(v_function_param_names.split('\n')))
-                v_wrapper += '    return C.' + v_name_original + v_function_param_names
-
-            v_wrapper += '\n}\n'
-            return ['@[keep_args_alive]\nfn C.' + v_name_original + c_func_def_params + ' ' + v_type + '\n' + v_wrapper, tdecl]
-
-    # Looks up if self.featureDictionary contains a given function name (or other item) under an extension.
-    # Returns the extension names under which the item was found.
-    def getFeatureConditionalCompilation(self,  item_str) -> (bool, [str]):
-        # self.featureDictionary.keys
-        # self.featureDictionary['VK_AMD_buffer_marker'].keys ==
-        # basetype, bitmask, command, define, enum, enumconstant, funcpointer, handle, include, struct, uninion
-        # self.featureDictionary['VK_AMD_buffer_marker']['command'].None[0] == 'vkCmdWriteBufferMarkerAMD'
-        ret_bool = False
-        ret_feature_names = []
-
-        for feature in self.featureDictionary.items():
-            featureName = feature[0]
-            # Only protect functions that need an extension, not a specific vulkan version
-            if featureName.startswith('VK_VERSION_'):
-                continue
-            for featureSection in feature[1].items():
-                featureSectionName = featureSection[0]
-                for featureSectionItem in featureSection[1].items():
-                    if featureSectionName == 'command' and item_str in featureSectionItem[1]:
-                        ret_bool = True
-                        ret_feature_names.append(featureName)
-        return ret_bool, ret_feature_names
+        v_wrapper += '\n}\n'
+        return ['@[keep_args_alive]\nfn C.' + v_name_original + c_func_def_params + ' ' + v_type + '\n' + v_wrapper, tdecl]
 
     # NOTE Anton: the oiginal method comes from vulkandocs/scripts/generator.py
     def genType(self, typeinfo, name, alias):

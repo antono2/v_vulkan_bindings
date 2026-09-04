@@ -91,8 +91,6 @@ def makeGenOpts(args):
         genFuncPointers=False,
         protectFile=protectFile,
         protectFeature=False,
-        protectProto='',
-        protectProtoStr='VK_NO_PROTOTYPES',
         apicall=' ',
         apientry=' ',
         apientryp='& ',
