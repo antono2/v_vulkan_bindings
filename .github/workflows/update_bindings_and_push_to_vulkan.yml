@@ -1,145 +1,143 @@
 name: Update bindings and push to vulkan
+
 on:
   schedule:
-    - cron: "0 6 * * *"   # run every day at 6:00 AM UTC
+    - cron: "0 6 * * *"
   workflow_dispatch:
+    inputs:
+      vk_docs_version:
+        description: "Optional Vulkan-Docs tag (for example v1.4.362)"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: update-vulkan-bindings
+  cancel-in-progress: false
+
 env:
-  DEPLOY_TARGET_REPO: 'antono2/vulkan'
+  DEPLOY_TARGET_REPO: antono2/vulkan
+
 jobs:
-  check_for_new_release:
-    name: Check for new release of Vulkan-Docs
+  versions:
     runs-on: ubuntu-latest
-    steps:
-    - name: Self checkout
-      uses: actions/checkout@v4
-    - id: getversions
-      run: |
-        echo "cur_release_version=$(cat VERSION)" >> $GITHUB_OUTPUT
-        echo "new_release_version=$(curl -sL https://api.github.com/repos/KhronosGroup/Vulkan-Docs/tags | jq -r ".[0].name")" >> $GITHUB_OUTPUT
-    - name: Check if EMPTY
-      if: ${{ steps.getversions.outputs.new_release_version == '' }}
-      uses: actions/github-script@v3
-      with:
-        script: |
-          core.setFailed('Could not get new_release_version from https://api.github.com/repos/KhronosGroup/Vulkan-Docs/tags')
-    - name: Check for new version
-      if: ${{ steps.getversions.outputs.cur_release_version == steps.getversions.outputs.new_release_version }}
-      uses: actions/github-script@v3
-      with:
-        script: |
-          core.setFailed('Version ${{ steps.getversions.outputs.cur_release_version }} already up to date with KhronosGroup/Vulkan-Docs.')
     outputs:
-      cur_release_version: ${{ steps.getversions.outputs.cur_release_version }}
-      new_release_version: ${{ steps.getversions.outputs.new_release_version }}
-    
-  update_bindings_and_upload_artifact:
-    needs:
-      - check_for_new_release
-    name: Update Bindings, Version and Push to vulkan
+      requested: ${{ steps.versions.outputs.requested }}
+      changed: ${{ steps.versions.outputs.changed }}
+    steps:
+      - uses: actions/checkout@v7
+      - id: versions
+        env:
+          REQUESTED_VERSION: ${{ inputs.vk_docs_version }}
+        run: |
+          set -euo pipefail
+          current=$(cat VERSION)
+          requested=$REQUESTED_VERSION
+          if [[ -z "$requested" ]]; then
+            requested=$(curl --fail --silent --show-error --location \
+              https://api.github.com/repos/KhronosGroup/Vulkan-Docs/tags | jq -er '.[0].name')
+          fi
+          [[ "$requested" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || exit 1
+          changed=true
+          [[ "$current" == "$requested" ]] && changed=false
+          echo "requested=$requested" >> "$GITHUB_OUTPUT"
+          echo "changed=$changed" >> "$GITHUB_OUTPUT"
+          echo "Current: $current; requested: $requested; update required: $changed"
+
+  generate:
+    needs: versions
+    if: needs.versions.outputs.changed == 'true'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7
+        with:
+          repository: KhronosGroup/Vulkan-Docs
+          path: vulkandocs
+          ref: ${{ needs.versions.outputs.requested }}
+      - uses: prantlf/setup-v-action@v4
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.x"
+      - name: Generate bindings
+        run: |
+          set -euo pipefail
+          python src/main.py -registry vulkandocs/xml/vk.xml vulkan.v
+          python src/main.py -registry vulkandocs/xml/video.xml vulkan_video.v
+          v fmt -w src/vulkan.v
+          v fmt -w src/vulkan_video.v
+          printf '%s\n' '${{ needs.versions.outputs.requested }}' > VERSION
+      - uses: NcStudios/VulkanCI@v1.2
+        with:
+          sdkVersion: 1.4.309.0
+      - name: Download Volk and compile smoke test
+        run: |
+          set -euo pipefail
+          install -d "$VULKAN_SDK/include/volk"
+          curl --fail --silent --show-error --location https://raw.githubusercontent.com/zeux/volk/master/volk.h --output "$VULKAN_SDK/include/volk/volk.h"
+          curl --fail --silent --show-error --location https://raw.githubusercontent.com/zeux/volk/master/volk.c --output "$VULKAN_SDK/include/volk/volk.c"
+          v -cc gcc run test
+      - uses: actions/upload-artifact@v7
+        with:
+          name: v-vulkan-bindings-${{ needs.versions.outputs.requested }}
+          if-no-files-found: error
+          path: |
+            src/vulkan.v
+            src/vulkan_video.v
+            VERSION
+
+  deploy:
+    needs: [versions, generate]
     runs-on: ubuntu-latest
     steps:
-    - name: Self checkout
-      uses: actions/checkout@v4
-    - name: Checkout Vulkan-Docs
-      uses: actions/checkout@v4
-      with:
-        repository: KhronosGroup/Vulkan-Docs
-        path: vulkandocs
-        ref:  ${{ needs.check_for_new_release.outputs.new_release_version }}
-    - name: Setup Vlang
-      uses: prantlf/setup-v-action@v2.3.3
-    - name: Setup Python
-      uses: actions/setup-python@v5.2.0
-    - name: Generate bindings vulkan.v
-      run: |
-        python src/main.py -registry vulkandocs/xml/vk.xml vulkan.v
-    - name: Generate bindings vulkan_video.v
-      run: |
-        python src/main.py -registry vulkandocs/xml/video.xml vulkan_video.v
-    - name: v fmt -w src/vulkan.v
-      run: |
-        v fmt -w src/vulkan.v
-    - name: v fmt -w src/vulkan_video.v
-      run: |
-        v fmt -w src/vulkan_video.v
-
-    - name: Get version without v
-      # Without v prefix, just the number
-      id: get_version_without_v
-      run: echo "version=$(echo "${{ needs.check_for_new_release.outputs.new_release_version }}" | sed 's/v//')" >> $GITHUB_OUTPUT
-    - name: VulkanCI
-      uses: NcStudios/VulkanCI@v1.2
-      with:
-        # sdkVersion: ${{ steps.get_version_without_v.outputs.version }}
-        # 1.4.309.0 is the newest supported as of 14.10.2025
-        sdkVersion: 1.4.309.0
-    - name: Volk Download
-      id: download_volk
-      run: wget https://raw.githubusercontent.com/zeux/volk/refs/heads/master/volk.h -P "$VULKAN_SDK/include/volk" && wget https://raw.githubusercontent.com/zeux/volk/refs/heads/master/volk.c -P "$VULKAN_SDK/include/volk" && ls "$VULKAN_SDK/include/volk"
-    - name: Test
-      run: v -cc gcc run test
-
-    - name: Upload generated bindings artifact
-      uses: actions/upload-artifact@v4
-      id: upload_v_vulkan_bindings_output
-      with:
-        name: v_vulkan_bindings_output
-        path: |
-          src/vulkan.v
-          src/vulkan_video.v
-          VERSION
-  
-  download_artifact_and_deploy:
-    name: Download artifact and deploy
-    needs:
-      - check_for_new_release
-      - update_bindings_and_upload_artifact
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           repository: ${{ env.DEPLOY_TARGET_REPO }}
-          ref: 'master'
-          token:  ${{ secrets.PUSH_VULKAN }}
-      - name: Setup git config
-        run: |
-          git config --global user.name "GitHub Actions"
-          git config --global user.email "<>"
-
-      - name: Download generated template
-        uses: actions/download-artifact@v4
+          ref: master
+          token: ${{ secrets.PUSH_VULKAN }}
+      - uses: actions/download-artifact@v8
         with:
-          name: v_vulkan_bindings_output
-      
-      - name: Update VERSION, Commit and push generated bindings
+          name: v-vulkan-bindings-${{ needs.versions.outputs.requested }}
+          path: generated
+      - name: Commit and tag generated module
+        env:
+          RELEASE_TAG: ${{ needs.versions.outputs.requested }}
         run: |
-          echo "${{ needs.check_for_new_release.outputs.new_release_version }}" > VERSION
-          export COMMIT_MESSAGE="Generated bindings ${{ needs.check_for_new_release.outputs.new_release_version }}"
-          git add .
-          git commit -m "$COMMIT_MESSAGE"
-          git push
-          git tag "${{ needs.check_for_new_release.outputs.new_release_version }}" -m "V Vulkan Bindings for KhronosGroup/Vulkan-Docs ${{ needs.check_for_new_release.outputs.new_release_version }}"
-          git push origin "${{ needs.check_for_new_release.outputs.new_release_version }}"
+          set -euo pipefail
+          test -f c/volk.c.v
+          install -m 0644 generated/src/vulkan.v vulkan.v
+          install -m 0644 generated/src/vulkan_video.v vulkan_video.v
+          install -m 0644 generated/VERSION VERSION
+          git diff --check
+          git add vulkan.v vulkan_video.v VERSION
+          if git diff --cached --quiet; then exit 0; fi
+          if git ls-remote --exit-code --tags origin "refs/tags/$RELEASE_TAG" >/dev/null 2>&1; then
+            echo "Refusing to replace existing tag $RELEASE_TAG" >&2
+            exit 1
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Generated bindings $RELEASE_TAG"
+          git tag -a "$RELEASE_TAG" -m "V bindings for Vulkan-Docs $RELEASE_TAG"
+          git push --atomic origin HEAD:master "refs/tags/$RELEASE_TAG"
 
-  update_version:
-    name: Update VERSION
-    needs:
-      - check_for_new_release
-      - update_bindings_and_upload_artifact
-      - download_artifact_and_deploy
+  update-source-version:
+    needs: [versions, deploy]
     runs-on: ubuntu-latest
     steps:
-      # Clone v_vulkan_bindings, which is the repo this workflow is running on
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
-          ref: 'master'
-          token:  ${{ secrets.PUSH_VULKAN }}
-      - name: Update Version
+          ref: master
+          token: ${{ secrets.PUSH_VULKAN }}
+      - name: Commit generator version
         run: |
-          git config --global user.name "GitHub Actions"
-          git config --global user.email "<>"
-          echo "${{ needs.check_for_new_release.outputs.new_release_version }}" > VERSION
-          git add .
-          git commit -m "Updated VERSION to ${{ needs.check_for_new_release.outputs.new_release_version }}"
-          git push
-          
+          set -euo pipefail
+          printf '%s\n' '${{ needs.versions.outputs.requested }}' > VERSION
+          git add VERSION
+          if git diff --cached --quiet; then exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Update VERSION to ${{ needs.versions.outputs.requested }}"
+          git push origin HEAD:master
