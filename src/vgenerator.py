@@ -2,7 +2,7 @@
 #
 # MIT License
 #
-# Copyright Anton Oreskin | https://gosudev.de
+# Copyright Anton Oreskin | https://oreskin.de
 #
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -34,8 +34,8 @@ import string
 from generator import (GeneratorOptions,
                        MissingGeneratorOptionsConventionsError,
                        MissingGeneratorOptionsError, MissingRegistryError,
-                       OutputGenerator, noneStr, 
-                       write)
+                       OutputGenerator, noneStr,
+                       write, genProtectDirective)
 
 class VGeneratorOptions(GeneratorOptions):
     """VGeneratorOptions - subclass of GeneratorOptions.
@@ -183,10 +183,6 @@ class VGeneratorOptions(GeneratorOptions):
 class VOutputGenerator(OutputGenerator):
     """Generates V-language API interfaces."""
 
-    # File that stores the exact C code string for anything found with REPLACEMENT_CONTAINS_ARR
-    # The C code can then be used in REPLACEMENT_MAP
-    REPLACEMENT_MAP_FILE_PATH = "../../REPLACEMENT_MAP.txt"
-
     # This is an ordered list of sections in the header file.
     TYPE_SECTIONS = ['include', 'define', 'basetype', 'handle', 'enum',
                      'group', 'bitmask', 'funcpointer', 'struct']
@@ -194,16 +190,28 @@ class VOutputGenerator(OutputGenerator):
 
     # These are used to find the base alias in genGroup,
     BASE_TYPES_ARR = [
+        'bool',
+        'string',
+        'i8',
+        'u8',
+        'i16',
+        'u16',
+        'u16',
+        'int',
         'u32',
+        'i64',
         'u64',
-        'usize', 
-        'f32', 
-        'i32', 
-        'int', 
-        'u16', 
-        'char', 
-        'voidptr'
+        'i128',
+        'u128',
+        'rune',  # Represents a Unicode code point. Should cause issues with a type `rune`, but there are currently none in vk.xml or video.xml
+        'f32',
+        'f64',
+        'isize',  # Platform-dependent, the size is how many bytes it takes to reference any location in memory
+        'usize',
+        'voidptr' # Points to an address in memory to a variable or function
     ]
+
+
 
     # Map like '(VkFlags: u32), (VkAccessFlags: u32),
     # where VkAccessFlags is an alias for VkFlags in C, but V doesn't allow aliasing,
@@ -228,13 +236,13 @@ class VOutputGenerator(OutputGenerator):
     # PhysicalDeviceVulkanMemoryModelFeatures -> physical_device_vulkan_memory_model_features
     # PhysicalDeviceShaderDemoteToHelperInvocationFeatures -> physical_device_shader_demote_to_helper_invocation_features
     # PhysicalDeviceTextureCompressionASTCHDRFeatures -> physical_device_texture_compression_astc_hdr_features
-    
+
     # There is an enum StructureType in the vulkan registry.
     # Also, each struct has a field sType containing this enum.
     # This array stores enum values and sets a default value for sType, if possible
     STRUCTURE_TYPES = []
     STRUCTURE_TYPES_NUMBER_WITH_UNDERSCORE_REGEX = re.compile('(?<=[A-Z])_(?P<num_after_underscore>[0-9])')
-    
+
     STD_VIDEO_MAKE_VERSION_REGEX = re.compile(r'#define VK_STD_VULKAN_VIDEO_CODEC(\w+)API_VERSION_(\d+)_(\d+)_(\d+)')
 
     # Array of enum names. To not set mut for enum types in funtion paramters
@@ -265,59 +273,34 @@ class VOutputGenerator(OutputGenerator):
         'float64*': '&f64',
     }
 
-    REPLACEMENT_MAP = {
-        '#if !defined(VK_NO_STDINT_H)\n    #include <stdint.h>\n#endif\n':
-        '',
-#        '#define VK_MAKE_VIDEO_STD_VERSION(major, minor, patch) \\\n    ((((uint32_t)(major)) << 22) | (((uint32_t)(minor)) << 12) | ((uint32_t)(patch)))\n':
-#        'pub fn make_video_std_version(major u32, minor u32, patch u32) u32 {\n  return (major << 22) | (minor << 12) | patch\n}\n',
-#        '\n#define VK_STD_VULKAN_VIDEO_CODEC_H264_DECODE_API_VERSION_1_0_0 VK_MAKE_VIDEO_STD_VERSION(1, 0, 0)\n':
-#        'pub const std_vulkan_video_codec_h264_decode_api_version_1_0_0 = make_video_std_version(1, 0, 0)\n', 
-#        '\n#define VK_STD_VULKAN_VIDEO_CODEC_H264_ENCODE_API_VERSION_1_0_0 VK_MAKE_VIDEO_STD_VERSION(1, 0, 0)\n':
-#        'pub const std_vulkan_video_codec_h264_encode_api_version_1_0_0 = make_video_std_version(1, 0, 0)\n', 
-#        '\n#define VK_STD_VULKAN_VIDEO_CODEC_H265_DECODE_API_VERSION_1_0_0 VK_MAKE_VIDEO_STD_VERSION(1, 0, 0)\n':
-#        'pub const std_vulkan_video_codec_h265_decode_api_version_1_0_0 = make_video_std_version(1, 0, 0)\n', 
-#        '\n#define VK_STD_VULKAN_VIDEO_CODEC_H265_ENCODE_API_VERSION_1_0_0 VK_MAKE_VIDEO_STD_VERSION(1, 0, 0)\n':
-#        'pub const std_vulkan_video_codec_h265_encode_api_version_1_0_0 = make_video_std_version(1, 0, 0)\n', 
-#        '\n#define VK_STD_VULKAN_VIDEO_CODEC_AV1_DECODE_API_VERSION_1_0_0 VK_MAKE_VIDEO_STD_VERSION(1, 0, 0)\n':
-#        'pub const std_vulkan_video_codec_av1_decode_api_version_1_0_0 = make_video_std_version(1, 0, 0)\n', 
-#        '\n#define VK_STD_VULKAN_VIDEO_CODEC_AV1_ENCODE_API_VERSION_1_0_0 VK_MAKE_VIDEO_STD_VERSION(1, 0, 0)\n':
-#        'pub const std_vulkan_video_codec_av1_encode_api_version_1_0_0 = make_video_std_version(1, 0, 0)\n', 
-        
-        
-        '\n#define VK_DEFINE_HANDLE(object) typedef struct object##_T* object;\n':
-        '',
-        '\n#ifndef VK_USE_64_BIT_PTR_DEFINES\n    #if defined(__LP64__) || defined(_WIN64) || (defined(__x86_64__) && !defined(__ILP32__) ) || defined(_M_X64) || defined(__ia64) || defined (_M_IA64) || defined(__aarch64__) || defined(__powerpc64__) || (defined(__riscv) && __riscv_xlen == 64)\n        #define VK_USE_64_BIT_PTR_DEFINES 1\n    #else\n        #define VK_USE_64_BIT_PTR_DEFINES 0\n    #endif\n#endif\n':
-        '',
-        '\n#ifndef VK_DEFINE_NON_DISPATCHABLE_HANDLE\n    #if (VK_USE_64_BIT_PTR_DEFINES==1)\n        #if (defined(__cplusplus) && (__cplusplus >= 201103L)) || (defined(_MSVC_LANG) && (_MSVC_LANG >= 201103L))\n            #define VK_NULL_HANDLE nullptr\n        #else\n            #define VK_NULL_HANDLE ((void*)0)\n        #endif\n    #else\n        #define VK_NULL_HANDLE 0ULL\n    #endif\n#endif\n#ifndef VK_NULL_HANDLE\n    #define VK_NULL_HANDLE 0\n#endif\n':
-        '',
-        '\n#ifndef VK_DEFINE_NON_DISPATCHABLE_HANDLE\n    #if (VK_USE_64_BIT_PTR_DEFINES==1)\n        #define VK_DEFINE_NON_DISPATCHABLE_HANDLE(object) typedef struct object##_T *object;\n    #else\n        #define VK_DEFINE_NON_DISPATCHABLE_HANDLE(object) typedef uint64_t object;\n    #endif\n#endif\n':
-        '',
-        # Deprecated, just replace with empty
-        '// VK_MAKE_VERSION is deprecated, but no reason was given in the API XML\n// DEPRECATED: This define is deprecated. VK_MAKE_API_VERSION should be used instead.\n#define VK_MAKE_VERSION(major, minor, patch) \\\n    ((((uint32_t)(major)) << 22U) | (((uint32_t)(minor)) << 12U) | ((uint32_t)(patch)))\n':
-        '',
-        '// VK_VERSION_MAJOR is deprecated, but no reason was given in the API XML\n// DEPRECATED: This define is deprecated. VK_API_VERSION_MAJOR should be used instead.\n#define VK_VERSION_MAJOR(version) ((uint32_t)(version) >> 22U)\n':
-        '',
-        '// VK_VERSION_MINOR is deprecated, but no reason was given in the API XML\n// DEPRECATED: This define is deprecated. VK_API_VERSION_MINOR should be used instead.\n#define VK_VERSION_MINOR(version) (((uint32_t)(version) >> 12U) & 0x3FFU)\n':
-        '',
-        '// VK_VERSION_PATCH is deprecated, but no reason was given in the API XML\n// DEPRECATED: This define is deprecated. VK_API_VERSION_PATCH should be used instead.\n#define VK_VERSION_PATCH(version) ((uint32_t)(version) & 0xFFFU)\n':
-        '',
-#        '#define VK_MAKE_API_VERSION(variant, major, minor, patch) \\\n    ((((uint32_t)(variant)) << 29U) | (((uint32_t)(major)) << 22U) | (((uint32_t)(minor)) << 12U) | ((uint32_t)(patch)))\n':
-#        'pub fn make_api_version(variant u32, major u32, minor u32, patch u32) u32 {\n  return (variant << 29) | (major << 22) | (minor << 12) | patch\n}\n',
-#
-#        '// Vulkan 1.0 version number\n#define VK_API_VERSION_1_0 VK_MAKE_API_VERSION(0, 1, 0, 0)// Patch version should always be set to 0\n':
-#        'pub const api_version_1_0 = make_api_version(0, 1, 0, 0) // Patch version should always be set to 0',
-#        '// Complete version of this file\n#define VK_HEADER_VERSION_COMPLETE VK_MAKE_API_VERSION(0, 1, 4, VK_HEADER_VERSION)\n':
-#        'pub const header_version_complete = make_api_version(0, 1, 4, header_version)',
-#        '// Complete version of this file\n#define VK_HEADER_VERSION_COMPLETE VK_MAKE_API_VERSION(0, 1, 3, VK_HEADER_VERSION)\n':
-#        'pub const header_version_complete = make_api_version(0, 1, 3, header_version)',
-#        '#define VK_API_VERSION_VARIANT(version) ((uint32_t)(version) >> 29U)':
-#        'pub fn version_variant(version u32) u32 {\n  return version >> 29\n}',
-#        '#define VK_API_VERSION_MAJOR(version) (((uint32_t)(version) >> 22U) & 0x7FU)':
-#        'pub fn api_version_major(version u32) u32 {\n  return (version >> 22) & u32(0x7F)\n}',
-#        '#define VK_API_VERSION_MINOR(version) (((uint32_t)(version) >> 12U) & 0x3FFU)':
-#        'pub fn api_version_minor(version u32) u32 {\n  return (version >> 12) & u32(0x3FF)\n}',
-#        '#define VK_API_VERSION_PATCH(version) ((uint32_t)(version) & 0xFFFU)':
-#        'pub fn api_version_patch(version u32) u32 {\n  return version & u32(0xFFF)\n}',
+    EXTERNAL_TYPE_MAP = {
+        'Display': 'voidptr',
+        'Window': 'usize',
+        'VisualID': 'usize',
+        'RROutput': 'usize',
+        'xcb_connection_t': 'voidptr',
+        'xcb_window_t': 'u32',
+        'xcb_visualid_t': 'u32',
+        'wl_display': 'voidptr',
+        'wl_surface': 'voidptr',
+        'HINSTANCE': 'voidptr',
+        'HWND': 'voidptr',
+        'HANDLE': 'voidptr',
+        'HMONITOR': 'voidptr',
+        'LPCWSTR': '&u16',
+        'DWORD': 'u32',
+        'SECURITY_ATTRIBUTES': 'voidptr',
+        'GgpStreamDescriptor': 'usize',
+        'GgpFrameToken': 'u64',
+        'zx_handle_t': 'u32',
+        'IDirectFB': 'voidptr',
+        'IDirectFBSurface': 'voidptr',
+        'CAMetalLayer': 'voidptr',
+        '_screen_context': 'voidptr',
+        '_screen_window': 'voidptr',
+        '_screen_buffer': 'voidptr',
+        'ubm_device': 'voidptr',
+        'ubm_surface': 'voidptr',
     }
 
     # Contains all struct handles in vulkan.
@@ -329,13 +312,13 @@ class VOutputGenerator(OutputGenerator):
     # Used to find static C code, like #define VK_API_VERSION_MAJOR in appendSection
     # The exact C code is then replaced in genType
     REPLACEMENT_CONTAINS_ARR = [
-        'STD_VIDEO_DECODE_H264_FIELD_ORDER_COUNT_LIST_SIZE', 
-        'VK_MAKE_VIDEO_STD_VERSION(major, minor, patch)', 
-        'VK_STD_VULKAN_VIDEO_CODEC_H264_DECODE_API_VERSION_1_0_0', 
-        '#define VK_STD_VULKAN_VIDEO_CODEC_H264_ENCODE_API_VERSION_1_0_0 VK_MAKE_VIDEO_STD_VERSION(1, 0, 0)', 
-        '#define VK_STD_VULKAN_VIDEO_CODEC_H265_DECODE_API_VERSION_1_0_0 VK_MAKE_VIDEO_STD_VERSION(1, 0, 0)', 
-        'VK_STD_VULKAN_VIDEO_CODEC_AV1_DECODE_API_VERSION_1_0_0', 
-        'VK_STD_VULKAN_VIDEO_CODEC_AV1_ENCODE_API_VERSION_1_0_0', 
+        'STD_VIDEO_DECODE_H264_FIELD_ORDER_COUNT_LIST_SIZE',
+        'VK_MAKE_VIDEO_STD_VERSION(major, minor, patch)',
+        'VK_STD_VULKAN_VIDEO_CODEC_H264_DECODE_API_VERSION_1_0_0',
+        '#define VK_STD_VULKAN_VIDEO_CODEC_H264_ENCODE_API_VERSION_1_0_0 VK_MAKE_VIDEO_STD_VERSION(1, 0, 0)',
+        '#define VK_STD_VULKAN_VIDEO_CODEC_H265_DECODE_API_VERSION_1_0_0 VK_MAKE_VIDEO_STD_VERSION(1, 0, 0)',
+        'VK_STD_VULKAN_VIDEO_CODEC_AV1_DECODE_API_VERSION_1_0_0',
+        'VK_STD_VULKAN_VIDEO_CODEC_AV1_ENCODE_API_VERSION_1_0_0',
         '#define VK_DEFINE_HANDLE',
         '\n#ifndef VK_DEFINE_NON_DISPATCHABLE_HANDLE\n    #if (VK_USE_64_BIT_PTR_DEFINES==1)\n        #if (defined(__cplusplus) && (__cplusplus >= 201103L)) || (defined(_MSVC_LANG) && (_MSVC_LANG >= 201103L))\n            #define VK_NULL_HANDLE nullptr\n        #else\n            #define VK_NULL_HANDLE ((void*)0)\n        #endif\n    #else\n        #define VK_NULL_HANDLE 0ULL\n    #endif\n#endif\n#ifndef VK_NULL_HANDLE\n    #define VK_NULL_HANDLE 0\n#endif',
         '\n#ifndef VK_USE_64_BIT_PTR_DEFINES\n    #if defined(__LP64__) || defined(_WIN64) || (defined(__x86_64__) && !defined(__ILP32__) ) || defined(_M_X64) || defined(__ia64) || defined (_M_IA64) || defined(__aarch64__) || defined(__powerpc64__) || (defined(__riscv) && __riscv_xlen == 64)\n        #define VK_USE_64_BIT_PTR_DEFINES 1\n    #else\n        #define VK_USE_64_BIT_PTR_DEFINES 0\n    #endif\n#endif',
@@ -352,10 +335,6 @@ class VOutputGenerator(OutputGenerator):
         '#define VK_API_VERSION_MINOR',
         '#define VK_API_VERSION_PATCH',
     ]
-    
-    # The generator fills this ARR with exact C code to write to replacement_map.txt,
-    # which can then be put in REPLACEMENT_MAP above
-    REPLACEMENT_EXACT_TEXT_ARR = []
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -373,7 +352,7 @@ class VOutputGenerator(OutputGenerator):
             write("""/*
 MIT License
 
-Copyright Anton Oreskin | https://gosudev.de
+Copyright Anton Oreskin | https://oreskin.de
 
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -408,21 +387,6 @@ SOFTWARE.
             raise MissingGeneratorOptionsError()
         # Finish processing in superclass
         OutputGenerator.endFile(self)
-
-        # Write REPLACEMENT_EXACT_TEXT_ARR to replacement_map.txt
-        # This exact C code can then be (manually) put in REPLACEMENT_MAP.
-        # genType will then replace the c_body with v_body
-        # filepath is "../../../REPLACEMENT_MAP.txt"
-        # absolute path is "~/workspace/v_vulkan_bindings/REPLACEMENT_MAP.txt"
-        with open(self.REPLACEMENT_MAP_FILE_PATH, "w") as text_file:
-            key_strings = ''
-            for itm in self.REPLACEMENT_EXACT_TEXT_ARR:
-                # Writing to file puts new lines instead of just '\n'
-                key_strings = key_strings + "'" + self.escStr(itm).replace('\\', '\\\\').replace('\n',
-                                                                                                 '\\n') + "':\n    '',\n    "
-            text_file.write("# This mapping contains exact C code (key), which will be replaced with the corresponding V code (value). Use the key in REPLACEMENT_MAP in src/vgenerator.py.\n# genType will then replace c_body with v_body.\n# Check REPLACEMENT_CONTAINS_ARR to add another key.\n\
-REPLACEMENT_MAP = {{\n    {}\n}}".format(key_strings))
-
 
     def beginFeature(self, interface, emit):
         # Start processing in superclass
@@ -526,18 +490,10 @@ REPLACEMENT_MAP = {{\n    {}\n}}".format(key_strings))
 
         # Add text to REPLACEMENT_EXACT_TEXT_ARR if it is in REPLACEMENT_CONTAINS_ARR
         # See REPLACEMENT_CONTAINS_ARR for explanation
-        # Note Anton: https://github.com/vlang/v/issues/24164
-        # Function parameter 3 is an array that is not known to V
-        if 'pub fn cmd_set_fragment_shading_rate_enum_nv' in text or 'pub fn cmd_set_fragment_shading_rate_khr' in text:
-            text = '/*' + text + '*/'
         esc_text = self.escStr(text)
         for starts_with in self.REPLACEMENT_CONTAINS_ARR:
             if text.__contains__(starts_with):
                 self.REPLACEMENT_EXACT_TEXT_ARR.append(esc_text)
-
-        if esc_text in self.REPLACEMENT_MAP:
-            text = self.REPLACEMENT_MAP[esc_text]
-
         self.sections[section].append(text)
         self.feature_not_empty = True
 
@@ -562,6 +518,13 @@ REPLACEMENT_MAP = {{\n    {}\n}}".format(key_strings))
             # If the type is a struct type, generate it using the
             # special-purpose generator.
             self.genStruct(typeinfo, name, alias, keep_vk_member_name = True)
+        elif category == 'funcpointer':
+            return self.build_funcpointer_type_decl(typeinfo, name, alias)
+        elif category is None and name and name[:1].islower() and alias is None:
+            # Skip builtin/already-mapped C types so they do not emit useless virtual C structs.
+            if name in self.TYPE_MAP or name in ['void', 'size_t', 'uint32_t', 'uint64_t']:
+                return None
+            return ('struct', '@[typedef]\npub struct C.' + name + ' {}')
         else:
             if self.genOpts is None:
                 raise MissingGeneratorOptionsError()
@@ -612,6 +575,13 @@ REPLACEMENT_MAP = {{\n    {}\n}}".format(key_strings))
             # If the type is a struct type, generate it using the
             # special-purpose generator.
             self.genStruct(typeinfo, name, alias, keep_vk_member_name = True)
+        elif category == 'funcpointer':
+            return self.build_funcpointer_type_decl(typeinfo, name, alias)
+        elif category is None and name and name[:1].islower() and alias is None:
+            # Skip builtin/already-mapped C types so they do not emit useless virtual C structs.
+            if name in self.TYPE_MAP or name in ['void', 'size_t', 'uint32_t', 'uint64_t']:
+                return None
+            return ('struct', '@[typedef]\npub struct C.' + name + ' {}')
         else:
             if self.genOpts is None:
                 raise MissingGeneratorOptionsError()
@@ -643,10 +613,8 @@ REPLACEMENT_MAP = {{\n    {}\n}}".format(key_strings))
                             v_type = '&{}'.format('C.Vk' + name)
                             v_is_handle = True
                         elif noneStr(elem.text) == 'VK_DEFINE_NON_DISPATCHABLE_HANDLE':
-                            # Note: Not sure if we want 64 bit pointers for opaque types, instead of voidptr
-                            # v_type = 'u64(&{})'.format(name)
-                            # self.C_STRUCT_ARR.append(name)
-                            v_type = '&{}'.format('C.' + name)
+                            # NON_DISPATCHABLE pointer is uint64_t and only used internally
+                            v_type = 'u64({})'.format(name)
                             v_is_handle = True
                         else:
                             v_type = noneStr(elem.text)
@@ -663,7 +631,7 @@ REPLACEMENT_MAP = {{\n    {}\n}}".format(key_strings))
                             if v_type in self.TYPE_MAP:
                                 v_type = self.TYPE_MAP[v_type]
 
-                            v_type = self.removeVk(v_type)
+                            v_type = self.translate_external_c_type_name(self.removeVk(v_type))
 
                             if 'PFN_' in name and '*' in body:
                                 v_params[0] = (v_params[0][0], 'voidptr')
@@ -674,10 +642,10 @@ REPLACEMENT_MAP = {{\n    {}\n}}".format(key_strings))
                                 param_name = param_name.replace('*', '').replace('const', '').strip()
                                 if v_type in self.C_STRUCT_ARR:
                                     for _ in range(ptr_count):
-                                        v_type = '&' + v_type 
+                                        v_type = '&' + v_type
                                 else:
                                     for _ in range(ptr_count):
-                                        v_type = '&' + v_type 
+                                        v_type = '&' + v_type
                                 # In case of 'void*', v_type will be just '&', as void was replaced with empty string by TYPE_MAP
                                 if v_type.replace('&', '') == '':
                                     v_type = 'voidptr'
@@ -730,9 +698,9 @@ REPLACEMENT_MAP = {{\n    {}\n}}".format(key_strings))
                     else:
                         v_value = noneStr(elem.text) + noneStr(elem.tail).replace(';', '')
                         v_text = 'type'
-            v_type = self.removeVk(v_type)
-            v_name = self.removeVk(v_name)
-            v_value = self.removeVk(v_value)
+            v_type = self.strip_preprocessor_directives(self.removeVk(v_type))
+            v_name = self.strip_preprocessor_directives(self.removeVk(v_name))
+            v_value = self.strip_preprocessor_directives(self.removeVk(v_value))
 
             # V doesn't allow for non basetype (u32, u64) alias,
             # so add the current type to ALIAS_TO_BASE_TYPE_MAP
@@ -752,13 +720,17 @@ REPLACEMENT_MAP = {{\n    {}\n}}".format(key_strings))
                     v_params_str += '\n {} {},'.format(param[0], param[1])
                 # Remove tailing ','
                 v_params_str = v_params_str[:-1]
-                body = 'pub type {} = fn ({}) {}'.format(v_name, v_params_str, v_params[0][1])
+                if len(v_params) == 0:
+                    body = 'pub type {} = fn ()'.format(v_name)
+                else:
+                    body = 'pub type {} = fn ({}) {}'.format(v_name, v_params_str, v_params[0][1])
                 # V bug where fn type definitons can not be multiple lines
                 # TODO: Double check and create an issue on V github
-                body = ' '.join(body.split('\n'))
+                #body = ' '.join(body.split('\n'))
             elif v_text and v_name and v_type:
-                # V doesn't allow for non basetype (u32, u64, ...) alias,
-                # so find the root basetype and assign that instead.
+                if re.match(r'^(API_VERSION(?:_[0-9_]+)?|HEADER_VERSION_COMPLETE)$', v_name):
+                    return
+                # Find the root basetype and assign that instead.
                 # This is also needed for setting mut on function calls later
                 if v_type in self.BASE_TYPES_ARR:
                     self.ALIAS_TO_BASE_TYPE_MAP[v_name] = v_type
@@ -776,6 +748,8 @@ REPLACEMENT_MAP = {{\n    {}\n}}".format(key_strings))
             # Handle OHNativeWindow and other basetypes. The actual OHNativeWindow type is defined in some other header.
             # Currently (2025) only &OHNativeWindow is used and is created by a vulkan function.
             elif v_value and v_text and category == 'basetype':
+                if not self.should_emit_external_basetype(v_value):
+                    return
                 body = 'pub type ' + v_value + ' = C.' + v_value + '\n@[typedef]\npub struct C.' + v_value + ' {}'
             else:
                 if category == 'include' or category == 'define':
@@ -788,8 +762,8 @@ REPLACEMENT_MAP = {{\n    {}\n}}".format(key_strings))
                         body = 'pub type {} = {}'.format(name, alias)
                 else:
                     #NOTE Anton: never reached, but feel free to check in future for new types
-                    print('Omitting body:\n' + body + '\n')
-#                    return section, body
+                    if body != '':
+                        print('Omitting body:' + body + '')
                     return
 
             if body:
@@ -801,24 +775,27 @@ REPLACEMENT_MAP = {{\n    {}\n}}".format(key_strings))
     def genProtectString(self, protect_str):
         """Generate protection string.
 
-        Protection strings are the strings defining the OS/Platform/Graphics
-        requirements for a given API command.  When generating the
-        language header files, we need to make sure the items specific to a
-        graphics API or OS platform are properly wrapped in #ifs."""
-        protect_if_str = ''
-        protect_end_str = ''
+        Supports boolean expressions using the same syntax as 'depends':
+        - '+' for AND
+        - ',' for OR
+        - '()' for grouping
+        """
         if not protect_str:
-            return (protect_if_str, protect_end_str)
+            return ('', '')
 
-        if ',' in protect_str:
-            protect_list = protect_str.split(',')
-            protect_defs = ('defined(%s)' % d for d in protect_list)
-            protect_def_str = ' && '.join(protect_defs)
-            protect_if_str = '#if %s\n' % protect_def_str
-            protect_end_str = '#endif // %s\n' % protect_def_str
+        try:
+            protect_if, _protect_end = genProtectDirective(protect_str)
+        except Exception as e:
+            self.logMsg('warn', f'Failed to parse protect expression "{protect_str}": {e}')
+            protect_if = f'#ifdef {protect_str}'
+
+        if protect_if.startswith('#if '):
+            condition = protect_if[4:].strip()
+            protect_if_str = f'{protect_if}\n'
+            protect_end_str = f'#endif // {condition}\n'
         else:
-            protect_if_str = '#ifdef %s\n' % protect_str
-            protect_end_str = '#endif // %s\n' % protect_str
+            protect_if_str = f'{protect_if}\n'
+            protect_end_str = f'#endif // {protect_str}\n'
 
         return (protect_if_str, protect_end_str)
 
@@ -890,7 +867,7 @@ REPLACEMENT_MAP = {{\n    {}\n}}".format(key_strings))
             body +=  'C.'+ typeNameOrig + ' {\n'
             if typeName not in self.ALIAS_TO_BASE_TYPE_MAP:
                 self.ALIAS_TO_BASE_TYPE_MAP[typeName] = 'C.'+ typeNameOrig
-                
+
             targetLen = self.getMaxCParamTypeLength(typeinfo)
             body += 'pub mut:\n'
             for member in typeElem.findall('.//member'):
@@ -921,27 +898,17 @@ REPLACEMENT_MAP = {{\n    {}\n}}".format(key_strings))
             section = 'group'
 
         groupName = self.removeVk(groupName)
-
-        # NOTE Anton: In order to Replace C code instead of V code with REPLACEMENT_MAP,
-        # we need to generate C code
-        # Same is done in genGroup, genStruct, genType
         if alias:
-            cbody = 'typedef ' + alias + ' ' + groupName + ';\n'
-            if cbody in self.REPLACEMENT_MAP:
-                cbody = self.REPLACEMENT_MAP[cbody]
-                self.appendSection(section, cbody)
-            else:
-                groupName,  alias = self.v_translate_c_name_to_basetype(groupName, alias)
-                body = 'pub type ' + groupName + ' = ' + alias + '\n'
-                # Store enum name and alias. To ignore when setting mut for enum function paramters
-                if alias in self.ENUM_TYPES:
-                  self.ENUM_TYPES.append(groupName)
-
-                self.appendSection(section, body)
+            groupName,  alias = self.v_translate_c_name_to_basetype(groupName, alias)
+            body = 'pub type ' + groupName + ' = ' + alias + '\n'
+            # Store enum name and alias. To ignore when setting mut for enum function paramters
+            if alias in self.ENUM_TYPES:
+              self.ENUM_TYPES.append(groupName)
+            self.appendSection(section, body)
         else:
             if self.genOpts is None:
                 raise MissingGeneratorOptionsError()
-            # Note: set keep_vk_member_name to True to keep vk enum member names like VK_DYNAMIC_STATE_PATCH_CONTROL_POINTS_EXT
+            # NOTE: set keep_vk_member_name to True to keep vk enum member names like VK_DYNAMIC_STATE_PATCH_CONTROL_POINTS_EXT
             (section, body) = self.buildEnumVDecl(self.genOpts.genEnumBeginEndRange, groupinfo, groupName, keep_vk_member_name=False)
             self.appendSection(section, '\n' + body)
 
@@ -950,16 +917,71 @@ REPLACEMENT_MAP = {{\n    {}\n}}".format(key_strings))
 
         <enum> tags may specify their values in several ways, but are usually
         just integers."""
-        # c'...string...' error on alias. Ignore them
-        # https://github.com/vlang/v/issues/24235
+        # Things like
+        # VK_KHR_MAINTENANCE3_SPEC_VERSION VK_KHR_MAINTENANCE_3_SPEC_VERSION
+        # VK_KHR_MAINTENANCE3_EXTENSION_NAME VK_KHR_MAINTENANCE_3_EXTENSION_NAME
+        # Ignore, unless you need backwards-compatibility alias for wrong naming conventions
         if enuminfo.elem.attrib.get('deprecated') == 'aliased':
-           # return
            pass
 
         OutputGenerator.genEnum(self, enuminfo, name, alias)
         body = self.deprecationComment(enuminfo.elem)
         body += self.buildConstantVDecl(enuminfo, name, alias)
         self.appendSection('enum', body)
+
+    def sanitize_c_numeric_literal(self, value):
+        """Strip C-style numeric suffixes only from numeric literal tokens."""
+        sanitized = value.strip()
+        # Hex digits include A-F, so the F in 0xFF must never be mistaken for
+        # a floating-point suffix. C hexadecimal integer literals only use U/L
+        # suffixes; decimal literals may additionally use F.
+        sanitized = re.sub(
+            r'(?<![A-Za-z0-9_])(0[xX][0-9A-Fa-f]+)([uUlL]+)(?![A-Za-z0-9_])',
+            r'\1',
+            sanitized,
+        )
+        return re.sub(
+            r'(?<![A-Za-z0-9_])((?:(?:\d+\.\d*|\.\d+|\d+)(?:[eE][+-]?\d+)?))([uUlLfF]+)(?![A-Za-z0-9_])',
+            r'\1',
+            sanitized,
+        )
+
+    def strip_redundant_outer_parens(self, value):
+        stripped = value.strip()
+        while stripped.startswith('(') and stripped.endswith(')'):
+            depth = 0
+            wraps_entire_expression = True
+            balanced = True
+            for i, ch in enumerate(stripped):
+                if ch == '(':
+                    depth += 1
+                elif ch == ')':
+                    depth -= 1
+                    if depth < 0:
+                        balanced = False
+                        break
+                    if depth == 0 and i != len(stripped) - 1:
+                        wraps_entire_expression = False
+                        break
+            if not balanced or depth != 0 or not wraps_entire_expression:
+                break
+            stripped = stripped[1:-1].strip()
+        return stripped
+
+    def normalize_v_constant_expr(self, value, v_type='', prefix=''):
+        normalized = self.sanitize_c_numeric_literal(value)
+        normalized = self.strip_redundant_outer_parens(normalized)
+
+        # Vulkan commonly encodes "all bits set except low bits" values like
+        # (~0U), (~1U), (~2U). If we already emit the outer unary bitwise-not
+        # in V, collapse the inner C expression to avoid awkward output like
+        # ~u32((~0)) or ~u32(~2).
+        if prefix == '~' and v_type:
+            match = re.fullmatch(r'\(?\s*~\s*(0[xX][0-9A-Fa-f]+|\d+)\s*\)?', normalized)
+            if match:
+                normalized = match.group(1)
+
+        return normalized
 
     def buildConstantVDecl(self, enuminfo, name, alias):
         """Generate the C declaration for a constant (a single <enum>
@@ -974,17 +996,8 @@ REPLACEMENT_MAP = {{\n    {}\n}}".format(key_strings))
         prefix = ''
         v_type = ''
         v_name = name
-
-        # Only replace U,L,... in types like (~0ULL), not in names like 'vk_google_hlsl_functionality_1_extension_name'
-        if strVal.lower().startswith('vk') or strVal.startswith('0x'):
-            v_value = strVal
-        else:
-            v_value = (strVal.replace('~', '')
-                             .replace('U', '')
-                             .replace('L', '')
-                             .replace('F', '')
-                             .replace('(', '')
-                             .replace(')', ''))
+        # Normalize C-style constant expressions into more idiomatic V.
+        v_value = strVal.strip()
 
         if enuminfo.elem.get('type') and not alias:
             typeStr = enuminfo.elem.get('type')
@@ -994,6 +1007,8 @@ REPLACEMENT_MAP = {{\n    {}\n}}".format(key_strings))
                 print("Could not find matching V type for " + typeStr)
             if '~' in strVal:
                 prefix = '~'
+
+        v_value = self.normalize_v_constant_expr(v_value, v_type=v_type, prefix=prefix)
 
         v_name = v_name.lower().strip()
         # Don't .lower() the value for exact strings, like
@@ -1015,7 +1030,55 @@ REPLACEMENT_MAP = {{\n    {}\n}}".format(key_strings))
         else:
             body = 'pub const ' + v_name.ljust(33) + ' = ' + prefix + v_type.strip() + "(" + v_value + ")"
 
+        body = re.sub(r'\)\s*//', ') //', body)
         return body
+
+
+    def translate_xml_decl_type_to_v_type(self, type_text, pointer_suffix=''):
+        base_type = noneStr(type_text).strip()
+        mapped_type = self.TYPE_MAP.get(base_type, self.translate_external_c_type_name(self.removeVk(base_type)))
+        ptr_count = pointer_suffix.count('*')
+        if mapped_type == '':
+            return 'voidptr' if ptr_count > 0 else ''
+        if ptr_count > 0:
+            return ('&' * ptr_count) + mapped_type
+        return mapped_type
+
+    def build_funcpointer_type_decl(self, typeinfo, name, alias):
+        typeElem = typeinfo.elem
+        proto = typeElem.find('proto')
+        if proto is None:
+            return None
+        proto_name_elem = proto.find('name')
+        proto_type_elem = proto.find('type')
+        v_name = noneStr(proto_name_elem.text if proto_name_elem is not None else name).strip()
+        if not v_name:
+            return None
+        proto_type_text = noneStr(proto_type_elem.text if proto_type_elem is not None else '')
+        proto_pointer_suffix = noneStr(proto_type_elem.tail if proto_type_elem is not None else '')
+        return_type = self.translate_xml_decl_type_to_v_type(proto_type_text, proto_pointer_suffix)
+
+        params = []
+        for param in typeElem.findall('param'):
+            param_name_elem = param.find('name')
+            param_type_elem = param.find('type')
+            if param_name_elem is None or param_type_elem is None:
+                continue
+            raw_param_name = noneStr(param_name_elem.text).strip()
+            param_type_text = noneStr(param_type_elem.text)
+            param_pointer_suffix = noneStr(param_type_elem.tail)
+            param_type = self.translate_xml_decl_type_to_v_type(param_type_text, param_pointer_suffix)
+            if not param_type:
+                param_type = 'voidptr'
+            param_name = self.make_v_param_name(param, raw_param_name, param_type)
+            params.append(f'{param_name} {param_type}'.strip())
+
+        params_block = '(' + ', '.join(params) + ')' if params else '()'
+        body = f'pub type {v_name} = fn {params_block}'
+        if return_type:
+            body += f' {return_type}'
+        body += '\n'
+        return ('struct', body)
 
     def genCmd(self, cmdinfo, name, alias):
         "Command generation"
@@ -1045,6 +1108,52 @@ REPLACEMENT_MAP = {{\n    {}\n}}".format(key_strings))
             v_name_or_value = v_name_or_value[2:]
         return v_name_or_value
 
+    def strip_preprocessor_directives(self, text: str) -> str:
+        text = noneStr(text)
+        if not text:
+            return ''
+        lines = []
+        for line in text.splitlines():
+            stripped = line.strip()
+            if stripped.startswith('#if') or stripped.startswith('#ifdef') or stripped.startswith('#ifndef') or stripped.startswith('#else') or stripped.startswith('#elif') or stripped.startswith('#endif'):
+                continue
+            lines.append(line)
+        return '\n'.join(lines).strip()
+
+    def should_emit_external_basetype(self, name: str) -> bool:
+        name = noneStr(name).strip()
+        if not name:
+            return False
+        return name not in {'void', 'size_t', 'uint32_t', 'uint64_t'} and name not in self.EXTERNAL_TYPE_MAP
+
+    def translate_external_c_type_name(self, type_name: str) -> str:
+        type_name = noneStr(type_name).strip()
+        if not type_name:
+            return type_name
+        if type_name.startswith('C.') or type_name.startswith('&C.'):
+            return type_name
+
+        ptr_prefix = ''
+        while type_name.startswith('&'):
+            ptr_prefix += '&'
+            type_name = type_name[1:]
+
+        if not type_name:
+            return ptr_prefix + type_name
+
+        builtin_v_types = set(self.BASE_TYPES_ARR) | {'u8','u16','u32','u64','i8','i16','i32','i64','f32','f64','bool','byte','char','int','usize','isize','string','voidptr'}
+        if type_name in builtin_v_types:
+            return ptr_prefix + type_name
+        if type_name.startswith('PFN_'):
+            return ptr_prefix + type_name
+        if type_name in self.EXTERNAL_TYPE_MAP:
+            mapped = self.EXTERNAL_TYPE_MAP[type_name]
+            return ptr_prefix + mapped
+        if self.registry is not None:
+            if type_name in self.registry.typedict or ('Vk' + type_name) in self.registry.typedict:
+                return ptr_prefix + type_name
+        return ptr_prefix + 'voidptr'
+
     # V doesn't allow for non basetype (u32, u64) aliases,
     # so find the root basetype and assign that instead.
     # Returns basetype if found, the unchanged alias if not found
@@ -1052,14 +1161,19 @@ REPLACEMENT_MAP = {{\n    {}\n}}".format(key_strings))
         alias = self.removeVk(alias)
         name = self.removeVk(name)
         ptr_count = alias.count('&')
+        alias_no_ptr = alias.lstrip('&')
         if alias in self.BASE_TYPES_ARR:
+            self.ALIAS_TO_BASE_TYPE_MAP[name] = alias
+        elif alias_no_ptr in self.EXTERNAL_TYPE_MAP:
+            mapped = self.EXTERNAL_TYPE_MAP[alias_no_ptr]
+            alias = ('&' * ptr_count) + mapped if ptr_count else mapped
             self.ALIAS_TO_BASE_TYPE_MAP[name] = alias
         elif alias in self.C_STRUCT_ARR:
             alias = 'voidptr'
         # &C.VkCommandBuffer -> CommandBuffer
-        elif self.removeVk(alias.lstrip('&')) in self.C_STRUCT_ARR:
+        elif self.removeVk(alias_no_ptr) in self.C_STRUCT_ARR:
             for _ in range(ptr_count):
-                alias = '&' + alias 
+                alias = '&' + alias
             alias = 'C.Vk' + alias
             self.ALIAS_TO_BASE_TYPE_MAP[name] = alias
         else:
@@ -1068,28 +1182,6 @@ REPLACEMENT_MAP = {{\n    {}\n}}".format(key_strings))
                 self.ALIAS_TO_BASE_TYPE_MAP[name] = alias
 
         return name,  alias
-    
-    # TODO: remove, as only called once
-    def v_translate_type_basetype(self,  type) -> str:
-        if type in self.C_STRUCT_ARR_WITH_VK_PREFIX:
-            return 'voidptr'
-#        if type.startswith('['):
-#            type = 'voidptr'
-#        if type.startswith('&') or type.lstrip('&') in self.C_STRUCT_ARR_WITH_VK_PREFIX:
-#            type_without_amp = type[1:]
-#            ptr_count = 1
-#            if type_without_amp.startswith('&'):
-#                type_without_amp = type_without_amp[1:]
-#                ptr_count = 2
-#            if type_without_amp.startswith('&'):
-#                type_without_amp = type_without_amp[1:]
-#                ptr_count = 3
-#            type = 'voidptr'
-#            for _ in range(ptr_count):
-#                type = '&' + type
-#        
-        
-        return type
 
     def v_camel_to_snake_case(self, v_name) -> str:
         return self.CAMEL_TO_SNAKE_CASE_REGEX.sub(r'_\1', v_name).lower()
@@ -1110,8 +1202,8 @@ REPLACEMENT_MAP = {{\n    {}\n}}".format(key_strings))
         # video_codec_operation_flag_bits_khr
         words = structEnumNameSnakeCase.split('_')
         words_end = words
-        prefixToRemove = "" 
-        # Iterate over: [video, codec, operation, flag, bits, khr] 
+        prefixToRemove = ""
+        # Iterate over: [video, codec, operation, flag, bits, khr]
         #                 -> [video, codec, operation, flag, bits]
         #                 -> [video, codec, operation, flag]
         #                      ...
@@ -1123,17 +1215,17 @@ REPLACEMENT_MAP = {{\n    {}\n}}".format(key_strings))
             if memberName.startswith(prefixToRemove):
                 newName = newName[len(prefixToRemove):]
                 break
-        
+
         # Remove starting _
         if newName != '' and newName[0] == '_':
             newName = newName[1:]
 
-        # Iterate over: [video, codec, operation, flag, bits, khr] 
+        # Iterate over: [video, codec, operation, flag, bits, khr]
         #                 -> [codec, operation, flag, bits, khr]
         #                 -> [operation, flag, bits, khr]
         #                      ...
         # and remove from end of enum member name
-        # Note: `bits` corresponds to `bit` in member name
+        # NOTE: `bits` corresponds to `bit` in member name
         # Also, some member names have _khr postfix, but the enum name does not
         bits_index = next((i for i, value in enumerate(words_end) if value == 'bits'), -1)
         if (bits_index != -1):
@@ -1149,11 +1241,11 @@ REPLACEMENT_MAP = {{\n    {}\n}}".format(key_strings))
             if newName.endswith(postfixToRemove + '_khr'):
                 newName = newName[0:-len(postfixToRemove + '_khr')]
                 break
-        
+
         # Remove tailing _
         if newName != '' and newName[-1] == '_':
             newName = newName[0:-1]
-            
+
         # V does not allow for member names to start with a number, so add _ back
         if newName[0:1].isnumeric():
             newName = '_' + newName
@@ -1162,11 +1254,72 @@ REPLACEMENT_MAP = {{\n    {}\n}}".format(key_strings))
 
         return memberName
 
+    def param_is_const(self, param):
+        return 'const' in (noneStr(param.text) or '')
 
-    # Note Anton: the oiginal method comes from vulkandocs/scripts/generator.py
-    # This handles one function parameter and depending on which kind of function definition
-    # TODO: Some paramters aren't required anymore
-    def makeVParamDecl(self, typeName, param, aligncol, do_c_func_params=False, do_c_to_v_func_call_params=False, do_struct_members=False, do_base_type=False, keep_vk_member_name=False, do_array_voidptr=False):
+    def param_has_indirection(self, param):
+        text = noneStr(param.text)
+        if '[' in text or '*' in text:
+            return True
+        for elem in param:
+            tail = noneStr(elem.tail)
+            if '*' in tail or '[' in tail:
+                return True
+        return False
+
+    def param_needs_mut_keyword(self, param, v_type, do_struct_members=False):
+        if do_struct_members or self.param_is_const(param) or not self.param_has_indirection(param):
+            return False
+        type_to_check = v_type
+        m = re.match(r'(?:&|\[\d*\])*(?:C\.Vk)?(.*)', type_to_check)
+        if m:
+            type_to_check = m.group(1)
+        if (type_to_check in self.ENUM_TYPES
+            or type_to_check in self.BASE_TYPES_ARR
+            or (type_to_check in self.ALIAS_TO_BASE_TYPE_MAP
+                and self.ALIAS_TO_BASE_TYPE_MAP[type_to_check] in self.BASE_TYPES_ARR)):
+            return False
+        return True
+
+    def make_v_param_name(self, param, raw_name, v_type, do_struct_members=False):
+        v_name = raw_name
+        v_name = self.removeVk(v_name)
+        if not do_struct_members and v_name == 'module':
+            v_name = 'vkmodule'
+        if ':' in v_name:
+            v_name = v_name.split(':')[0]
+        if not do_struct_members:
+            if v_name == 'type':
+                v_name = 'type_param'
+            if self.param_is_const(param) and not v_name.startswith('const_'):
+                v_name = 'const_' + v_name
+            elif self.param_needs_mut_keyword(param, v_type, do_struct_members=do_struct_members) and not v_name.startswith('mut_'):
+                v_name = 'mut_' + v_name
+        return v_name
+
+    # Helper to generate the comment string
+    def get_member_comment(self, opt, noauto):
+        parts = []
+        if noauto == "true":
+            parts.append("See spec")
+
+        if opt is None:
+            parts.append("Required")
+        elif opt == "true":
+            parts.append("Optional, can be NULL or 0")
+        elif "," in opt:
+            # Splits "false,true" style logic for arrays
+            opts = opt.split(',')
+            ptr = "Pointer. Required" if opts[0] == "false" else "Pointer optional"
+            val = "0/NULL allowed" if opts[1] == "true" else "valid values required"
+            parts.append(f"{ptr}, but {val}")
+
+        return (". ".join(parts) if parts else "")
+
+    # NOTE Anton: the oiginal method comes from vulkandocs/scripts/generator.py
+    # This handles one function parameter and usually returns the paramdecl string.
+    # Parameter comment is returned as a tuple (paramdecl, comment) if do_comment=True and comment_inline=False
+    def makeVParamDecl(self, typeName, param, aligncol, do_c_func_params=False, do_c_to_v_func_call_params=False, do_struct_members=False, do_base_type=False, keep_vk_member_name=False, do_array_voidptr=False, do_comment=False, comment_inline=False):
         """Return a string which is an indented, formatted
         declaration for a `<param>` or `<member>` block (e.g. function parameter
         or structure/union member).
@@ -1184,17 +1337,23 @@ REPLACEMENT_MAP = {{\n    {}\n}}".format(key_strings))
         v_type = ''
         v_name = ''
         v_type_without_pointer = ''
-        is_const = False
-        
+
         for elem in param:
             text = noneStr(elem.text)
-            if 'const ' in text:
-                is_const = True
             tail = noneStr(elem.tail)
             text_plus_tail = text + tail.strip()
-            # Note: vk.xml registry has the attribute optional = true
-            # double check @[required] in V
-            #optional = param.get('optional')
+            # NOTE: vk.xml registry has the attribute optional="true",
+            # or even optional="false,true" in VkPipelineBinaryHandlesInfoKHR for pipelineBinaryCount
+            # "true" means the member can be NULL.
+            # "false,true" means the pointer to pipelineBinaryCount must NOT be NULL
+            # The second ",true" means the value for count can be 0
+            # Double check if we want to use @[required] in V.
+            # Just a comment should be fine.
+            optional = param.get('optional')
+            noautovalidity = param.get('noautovalidity')
+            comment = ''
+            if do_comment and optional is not None or  noautovalidity is not None:
+                comment = self.get_member_comment(optional, noautovalidity)
 
             if elem.tag == 'type':
                 # Translate C type to V type
@@ -1208,8 +1367,7 @@ REPLACEMENT_MAP = {{\n    {}\n}}".format(key_strings))
                     ptr_count = v_type.count('*')
 
                     if '*' in v_type:
-                        #NOTE Anton: Removing const, as it just signals that the pointer won't be changed by vulkan.
-                        # Also, convert * to & and keep count
+                        # Convert * to & and keep count
                         v_type_without_pointer =  v_type.replace('const ', '').replace('const', '')
                         v_type_without_pointer = v_type_without_pointer.replace('*', '').strip()
                         if v_type_without_pointer in self.TYPE_MAP:
@@ -1221,16 +1379,17 @@ REPLACEMENT_MAP = {{\n    {}\n}}".format(key_strings))
                         else:
                             if v_type_without_pointer in self.ALIAS_TO_BASE_TYPE_MAP:
                                 if self.ALIAS_TO_BASE_TYPE_MAP[v_type_without_pointer].startswith('C.'):
-                                    #v_type = ('&'*(pointer_count-1)) + v_type_without_pointer
-                                    v_type = ('&'*(ptr_count)) + v_type_without_pointer
+                                    v_type = ('&'*(ptr_count)) + self.translate_external_c_type_name(v_type_without_pointer)
                                 else:
-                                    v_type = ('&'*ptr_count) + v_type_without_pointer
+                                    v_type = ('&'*ptr_count) + self.translate_external_c_type_name(v_type_without_pointer)
 
                             else:
-                                v_type = ('&'*ptr_count)  + v_type_without_pointer
+                                v_type = ('&'*ptr_count)  + self.translate_external_c_type_name(v_type_without_pointer)
                     elif v_type in self.C_STRUCT_ARR:
                         pass
-                    elif v_type.lower().startswith("pfn_"):
+                    else:
+                        v_type = self.translate_external_c_type_name(v_type)
+                    if v_type.lower().startswith("pfn_"):
                         v_type = v_type + ' = unsafe { nil }'
             elif elem.tag == 'enum':
                 v_name = v_name + text_plus_tail
@@ -1238,7 +1397,6 @@ REPLACEMENT_MAP = {{\n    {}\n}}".format(key_strings))
                 v_name = prefix + text_plus_tail
                 if not keep_vk_member_name:
                     v_name = self.removeVk(v_name)
-            
 
             if self.should_insert_may_alias_macro and self.genOpts.conventions.is_voidpointer_alias(elem.tag, text, tail):
                 # OpenXR-specific macro insertion - but not in apiinc for the spec
@@ -1248,17 +1406,11 @@ REPLACEMENT_MAP = {{\n    {}\n}}".format(key_strings))
                 # Align at specified column, if possible
                 paramdecl = paramdecl.rstrip()
                 oldLen = len(paramdecl)
-                # This works around a problem where very long type names -
-                # longer than the alignment column - would run into the tail
-                # text.
-                #paramdecl = paramdecl.ljust(aligncol - 1) + ' '
                 newLen = len(paramdecl)
                 self.logMsg('diag', 'Adjust length of parameter decl from', oldLen, 'to', newLen, ':', paramdecl)
 
-
-
-            #NOTE Anton: pipeline_cache_uuid [VK_UUID_SIZE]u8
-            #                  to pipeline_cache_uuid [uuid_size]u8
+            #     pipeline_cache_uuid [VK_UUID_SIZE]u8
+            # to pipeline_cache_uuid [uuid_size]u8
             array_match = self.ARRAY_REGEX.match(v_name)
             if array_match:
                 v_name = v_name.replace(array_match.group(1), '')
@@ -1268,35 +1420,23 @@ REPLACEMENT_MAP = {{\n    {}\n}}".format(key_strings))
                 if do_array_voidptr:
                     v_type = 'voidptr'
 
-            #Note Anton: module is a reserved keywords in V
-            if not do_struct_members and v_name == 'module':
-                v_name = 'vkmodule'
-            # Note Anton: C supports custom types like 'uint32_t instanceCustomIndex:24;'
-            # We just remove the number of bits, as these types all fit into u32
-            if ':' in v_name:
-                v_name = v_name.split(':')[0]
-                
-            # Note Anton: Remove lower() once V allows for upper case members
-            # https://github.com/vlang/v/issues/20420
-            if not keep_vk_member_name:
-                v_name = self.v_camel_to_snake_case(v_name)
-            # Note Anton: After adding param names for const_ prefix, `type ImageType` throws error: unknown type `vulkan.type`
-            # So, change function parameter name
-            if not do_struct_members and v_name == 'type':
-                v_name = 'type_param'
-            # TODO: Setting const_ prefix on vkCreatePipelineLayout will segfault
-            # fn C.vkCreatePipelineLayout(device Device,  const_p_create_info &PipelineLayoutCreateInfo,  const_p_allocator &AllocationCallbacks,  p_pipeline_layout &PipelineLayout) Result
-            #if not do_struct_members and is_const:
-            #    v_name = 'const_' + v_name
+            v_name = self.make_v_param_name(
+                param,
+                v_name,
+                v_type,
+                do_struct_members=do_struct_members
+            )
+
             if not do_struct_members and not do_c_to_v_func_call_params:
-                # Note Anton: Adding parameter name just to set a 'const_' prefix, because the type itself can not be marked
-                #paramdecl = indent + v_type
-                paramdecl = ' ' + v_name + ' ' + v_type
+                if (not do_c_func_params) and self.param_needs_mut_keyword(param, v_type, do_struct_members=do_struct_members):
+                    paramdecl = ' mut ' + v_name + ' ' + v_type
+                else:
+                    paramdecl = ' ' + v_name + ' ' + v_type
             elif do_c_to_v_func_call_params:
                 paramdecl = indent + v_name
             else:
                 paramdecl = indent + v_name.ljust(aligncol - 1) + ' ' + v_type
-                
+
             if v_name == 'pNext' and v_type == 'voidptr':
                 paramdecl = paramdecl + ' = unsafe{ nil }'
             # Assuming typeName is the struct name
@@ -1304,7 +1444,7 @@ REPLACEMENT_MAP = {{\n    {}\n}}".format(key_strings))
                 paramdecl = paramdecl.replace(v_type, 'voidptr') + ' = unsafe{ nil }'
             if v_name == 'pUserData' and v_type == 'voidptr':
                 paramdecl = paramdecl + ' = unsafe{ nil }'
-            
+
             # For each item also check if its sType and can get a default value for StructureType
             if v_name == 'sType':
                 # PhysicalDeviceVulkan13Features -> physical_device_vulkan1_3_features
@@ -1316,34 +1456,18 @@ REPLACEMENT_MAP = {{\n    {}\n}}".format(key_strings))
                     if struct_type_enum != "":
                         paramdecl = paramdecl + ' = StructureType.' + struct_type_enum
 
-            # Clear prefix for subsequent iterations
-            if (prefix.find('const ') != -1):
-                is_const = True
             prefix = ''
-            
-       # Set mut for function paramters that are not const, except for enum types
-       # Note: Ignoring base types,
-       # because mutable arguments are only allowed for arrays, interfaces, maps, pointers, structs or their aliases
-        if (is_const == False and not do_struct_members):# and not do_c_to_v_func_call_params):
-                type_to_check = v_type
-                m = re.match(r'(?:&|\[\d*\])*(?:C\.Vk)?(.*)', type_to_check)                    
-                if (m):
-                    type_to_check = m.group(1)
-                if (not type_to_check in self.ENUM_TYPES
-                and not type_to_check in self.BASE_TYPES_ARR
-                and (not type_to_check in self.ALIAS_TO_BASE_TYPE_MAP
-                or not self.ALIAS_TO_BASE_TYPE_MAP[type_to_check] in self.BASE_TYPES_ARR)
-                ):
-                    paramdecl = 'mut' + paramdecl # TODO: When using /* mut */ error: inline comment is deprecated, please use line comment
-                    pass
 
         if aligncol == 0:
-            # Squeeze out multiple spaces other than the indentation
-            #paramdecl = indent + ' '.join(paramdecl.split())
             paramdecl = ' '.join(paramdecl.split())
-        return paramdecl
+        if do_comment and comment_inline:
+            return paramdecl  + ('// ' + v_name + ' ' + comment + '\n' if comment else '' )
+        elif do_comment:
+            return paramdecl, ('// ' + v_name + ' ' + comment  if comment else '' )
+        else:
+            return paramdecl
 
-    # Note Anton: the oiginal method comes from vulkandocs/scripts/generator.py
+    # NOTE Anton: the oiginal method comes from vulkandocs/scripts/generator.py
     def buildEnumVDecl(self, expand, groupinfo, groupName,  keep_vk_member_name=False):
         """Generate the C declaration for an enum"""
         if self.genOpts is None:
@@ -1393,10 +1517,10 @@ REPLACEMENT_MAP = {{\n    {}\n}}".format(key_strings))
                 self.logMsg('error', 'Invalid value for bitwidth attribute (', groupElem.get('bitwidth'), ') for enum type ', groupName, ' - must be less than or equal to 32\n')
                 exit(1)
             else:
-                # Note Anton: Default path. Code jumps right to here
+                # Default path. Code jumps right to here
                 return self.buildEnumVDecl_Enum(expand, groupinfo, groupName,  keep_vk_member_name=keep_vk_member_name)
 
-    # Note Anton: the oiginal method comes from vulkandocs/scripts/generator.py
+    # NOTE Anton: the oiginal method comes from vulkandocs/scripts/generator.py
     def buildEnumVDecl_BitmaskOrDefine(self, groupinfo, groupName, bitwidth, usedefine):
         """Generate the C declaration for an "enum" that is actually a
         set of flag bits"""
@@ -1436,17 +1560,12 @@ REPLACEMENT_MAP = {{\n    {}\n}}".format(key_strings))
 
         # Loop over the nested 'enum' tags.
         for elem in enums:
-            #deprecated = elem.get('deprecated') 
-            #if deprecated is not None:
-            #if deprecated == 'aliased':
-            #    continue;            
-            
             # Convert the value to an integer and use that to track min/max.
             # Values of form -(number) are accepted but nothing more complex.
             # Should catch exceptions here for more complex constructs. Not yet.
             (numVal, strVal) = self.enumToValue(elem, True, bitwidth, True)
             name = elem.get('name')
-            
+
             # Convert C const value to V type
             prefix = ''
             v_type = ''
@@ -1469,12 +1588,7 @@ REPLACEMENT_MAP = {{\n    {}\n}}".format(key_strings))
             if strVal.lower().startswith('vk'):
                 v_value = strVal
             else:
-                v_value = (strVal.replace('~', '')
-                                 .replace('U', '')
-                                 .replace('L', '')
-                                 .replace('F', '')
-                                 .replace('(', '')
-                                 .replace(')', ''))
+                v_value = self.sanitize_c_numeric_literal(strVal)
 
             # Range check for the enum value
             if numVal is not None and (numVal > maxValidValue or numVal < minValidValue):
@@ -1504,7 +1618,7 @@ REPLACEMENT_MAP = {{\n    {}\n}}".format(key_strings))
                         else:
                             self.logMsg('error', 'No such alias {} for enum {}'.format(strVal, name))
 
-                    # NOTE Anton: V doesn't allow for upper case function names and const variables
+                    # V doesn't allow for upper case function names and const variables
                     v_name = v_name.lower()
                     v_value = self.removeVk(v_value)
                     v_name = self.removeVk(v_name)
@@ -1517,7 +1631,6 @@ REPLACEMENT_MAP = {{\n    {}\n}}".format(key_strings))
                         val_concat = val_concat.lower()
                         decl += "pub const {} = {}\n".format(v_name, val_concat)
                     else:
-                        #NOTE Anton: vk_true and vk_false are hardcoded. To keep the prefix
                         if v_value.lower().startswith("vk"):
                             decl += "pub const {} = {}\n".format(v_name, v_value)
                         else:
@@ -1536,7 +1649,7 @@ REPLACEMENT_MAP = {{\n    {}\n}}".format(key_strings))
 
         return ("bitmask", body)
 
-    # Note Anton: the oiginal method comes from vulkandocs/scripts/generator.py
+    # NOTE Anton: the oiginal method comes from vulkandocs/scripts/generator.py
     def buildEnumVDecl_Enum(self, expand, groupinfo, groupName, keep_vk_member_name=False):
         """Generate the V declaration for an enumerated type"""
         groupElem = groupinfo.elem
@@ -1559,18 +1672,18 @@ REPLACEMENT_MAP = {{\n    {}\n}}".format(key_strings))
 
         # @@ Should use the type="bitmask" attribute instead
         isEnum = ('FLAG_BITS' not in expandPrefix)
-        
+
         # Prefix
         groupNameOrig = groupName
         groupName = self.removeVk(groupName)
         body =[]
         # Replace used as placeholder for 'as u32' if enum doesn't contain negative values
         body.append('pub enum ' + groupNameOrig +' ThisIsAplaceholderTO_REPLACE_LATERwithEnumType{')
-        
+
         # Store enum name and variations of it. To ignore when setting mut for function paramters
         if not groupNameOrig in self.STRUCTURE_TYPES:
             self.ENUM_TYPES.append(groupNameOrig)
-        
+
         # Allowable range for a C enum - which is that of a signed 32-bit integer
         maxValidValue = 2**(32 - 1) - 1
         minValidValue = (maxValidValue * -1) - 1
@@ -1615,9 +1728,9 @@ REPLACEMENT_MAP = {{\n    {}\n}}".format(key_strings))
             # V doesn't allow for upper case enum member names
             if not keep_vk_member_name:
                 name = self.removeVk(name).lower()
-            
+
             name = self.removeStructEnumNameFromMember(groupName,  name)
-            
+
             # Extension enumerants are only included if they are required
             if self.isEnumRequired(elem):
                 decl = ''
@@ -1638,6 +1751,7 @@ REPLACEMENT_MAP = {{\n    {}\n}}".format(key_strings))
                     self.STRUCTURE_TYPES.append(name)
                 if protect is not None:
                     decl += '\n#endif'
+                decl += '\n'
                 if numVal is not None:
                     body.append(decl)
                 else:
@@ -1671,20 +1785,19 @@ REPLACEMENT_MAP = {{\n    {}\n}}".format(key_strings))
         if (self.genOpts.codeGenerator or
             self.conventions.generate_max_enum_in_docs):
 
-            # NOTE Anton: V doesn't allow for upper case enum member names
+            # V doesn't allow for upper case enum member names
             expandPrefix = self.removeVk(expandPrefix).lower()
             expandSuffix = expandSuffix.lower()
-            # NOTE Anton: Sometimes a member named `invalid` has the same value as max_int and would be duplicate
+            # Sometimes a member named `invalid` has the same value as max_int and would be duplicate
             if ((len(list(filter (lambda x : (x.find('int(0x7FFFFFFF)') != -1 or x.find('int(0xFFFFFFFF)') != -1), body))) <= 0)):
               body.append(f'    max_enum{expandSuffix} = max_int')
 
        # Postfix
         body.append("}")
-        
+
         # Replace placeholder to make enum as u32 or not
-        # TODO: Ticket about need to cast u32(enum) types for " | " operation to concatinate flag bits
-        # error: only `==` and `!=` are defined on `enum`, use an explicit cast to `int` if needed
-        ret = '\n'.join(body)
+        #ret = '\n'.join(body)
+        ret = ''.join(body)
         if minValue is not None and minValue < 0:
             ret = ret.replace('ThisIsAplaceholderTO_REPLACE_LATERwithEnumType', '')
         else:
@@ -1764,19 +1877,28 @@ REPLACEMENT_MAP = {{\n    {}\n}}".format(key_strings))
         # self.indentFuncPointer
         # self.alignFuncParam
         n = len(params)
+
+        # Comments can be inline or block above funcion
+        comments = ''
+        do_comment=True
+        comment_inline=False
+
         # fn C.vk ...
         if n > 0:
             c_func_def_params = '(\n'
             for p in params:
-                cur_base_type = self.makeVParamDecl(v_name, p, self.genOpts.alignFuncParam, do_c_func_params=True, do_c_to_v_func_call_params=False, do_struct_members=False, do_base_type=False,  keep_vk_member_name=False)
+                cur_base_type,  comment = self.makeVParamDecl(v_name, p, self.genOpts.alignFuncParam, do_c_func_params=True, do_c_to_v_func_call_params=False, do_struct_members=False, do_base_type=False,  keep_vk_member_name=False,  do_comment=do_comment,  comment_inline=comment_inline)
                 c_func_def_params += '{}, '.format(cur_base_type)
+                if not comment_inline:
+                    comments +=  comment + '\n'
             c_func_def_params = c_func_def_params.rstrip(', ')
             c_func_def_params += ')'
         else:
             c_func_def_params = '()'
-            
+
+        # Comments\n
         # pub type PFN_vkGet ...
-        v_wrapper = ''
+        v_wrapper = comments.rstrip() + '\n'
         if n > 0:
             v_pub_type_pfn_param_names = '('
             for p in params:
@@ -1786,13 +1908,13 @@ REPLACEMENT_MAP = {{\n    {}\n}}".format(key_strings))
             v_pub_type_pfn_param_names += ')'
         else:
             v_pub_type_pfn_param_names = '()'
-        
+
         # Add PFN_func type defintion for each vk function.
         # These are not part of vulkan, but of the bindings for V
         if v_type == 'PFN_vkVoidFunction':
-            v_wrapper += 'pub type PFN_{} = fn{} voidptr\n'.format(v_name_original,  v_pub_type_pfn_param_names) 
+            v_wrapper += 'pub type PFN_{} = fn{} voidptr\n'.format(v_name_original,  v_pub_type_pfn_param_names)
         else:
-            v_wrapper += 'pub type PFN_{} = fn{} {}\n'.format(v_name_original,  v_pub_type_pfn_param_names,  v_type) 
+            v_wrapper += 'pub type PFN_{} = fn{} {}\n'.format(v_name_original,  v_pub_type_pfn_param_names,  v_type)
 
 
         # pub fn get_ ...
@@ -1808,31 +1930,33 @@ REPLACEMENT_MAP = {{\n    {}\n}}".format(key_strings))
                 its_an_array = False
                 if cur_base_type.startswith('['):
                     its_an_array = True
-                cur_base_type = self.v_translate_type_basetype(cur_base_type.lstrip())
+                if cur_base_type.lstrip() in self.C_STRUCT_ARR_WITH_VK_PREFIX:
+                    cur_base_type = 'voidptr'
+                else:
+                   cur_base_type = cur_base_type.lstrip()
                 cur_param_name = self.makeVParamDecl(v_name, p, self.genOpts.alignFuncParam, do_c_func_params=False, do_c_to_v_func_call_params=True).lstrip()
                 if its_an_array:
                     v_function_params_cast_base += '{}({}.data), '.format(cur_base_type,  cur_param_name)
                 else:
                     v_function_params_cast_base += '{}({}), '.format(cur_base_type,  cur_param_name)
             v_function_params_cast_base = v_function_params_cast_base.rstrip(', ')
-            
+
             v_function_params_cast_base += ')'
 
             v_function_param_names_and_types = '(\n'
             v_function_param_names_and_types += ',\n'.join(self.makeVParamDecl(v_name, p, self.genOpts.alignFuncParam, do_c_func_params=False, do_c_to_v_func_call_params=False, do_array_voidptr=False).lstrip()
                                             for p in params)
             v_function_param_names_and_types += ')'
-            
+
             v_function_param_names = '(\n'
             v_function_param_names += ',\n'.join(self.makeVParamDecl(v_name, p, self.genOpts.alignFuncParam, do_c_func_params=False, do_c_to_v_func_call_params=True).lstrip()
                                             for p in params)
             v_function_param_names += ')'
-            
+
         else:
             v_function_param_names = '()'
             v_function_params_cast_base = '()'
             v_function_param_names = ()
-
 
         #NOTE: V function with VK_NO_PROTOTYPES conditional compilation
         #NOTE: PFN_vkVoidFunction is defined as `voidptr` - pointer to a function - and has to be cast to the correct `PFN_...` by the user
@@ -1840,7 +1964,6 @@ REPLACEMENT_MAP = {{\n    {}\n}}".format(key_strings))
         if v_type == 'PFN_vkVoidFunction':
             v_type = 'voidptr'
         # Append V function params
-        #v_wrapper += v_function_param_names_and_types + ' ' + v_type + " {\n"
         v_wrapper += v_function_param_names_and_types + v_type + " {\n"
         v_type_stripped = v_type.strip()
 
@@ -1874,11 +1997,14 @@ REPLACEMENT_MAP = {{\n    {}\n}}".format(key_strings))
         else:
             # C call inside V function
             if v_type_stripped == '': # has no return type
-                v_wrapper += '    C.' + v_name_original + '{}'.format(' '.join(v_function_param_names.split('\n')))
+                #v_wrapper += '    C.' + v_name_original + '{}'.format(' '.join(v_function_param_names.split('\n')))
+                v_wrapper += '    C.' + v_name_original + v_function_param_names
             elif v_type_stripped == 'Result': # vk.Result return type
-                v_wrapper += '    return C.' + v_name_original + '{}'.format(' '.join(v_function_param_names.split('\n')))
+                #v_wrapper += '    return C.' + v_name_original + '{}'.format(' '.join(v_function_param_names.split('\n')))
+                v_wrapper += '    return C.' + v_name_original + v_function_param_names
             else: # has any other return type
-                v_wrapper += '    return C.' + v_name_original + '{}'.format(' '.join(v_function_param_names.split('\n')))
+                #v_wrapper += '    return C.' + v_name_original + '{}'.format(' '.join(v_function_param_names.split('\n')))
+                v_wrapper += '    return C.' + v_name_original + v_function_param_names
 
             v_wrapper += '\n}\n'
             return ['@[keep_args_alive]\nfn C.' + v_name_original + c_func_def_params + ' ' + v_type + '\n' + v_wrapper, tdecl]
@@ -1901,16 +2027,12 @@ REPLACEMENT_MAP = {{\n    {}\n}}".format(key_strings))
             for featureSection in feature[1].items():
                 featureSectionName = featureSection[0]
                 for featureSectionItem in featureSection[1].items():
-#                    print(featureName + ', ' + featureSectionName)
-#                    print(featureSectionItem[1])
                     if featureSectionName == 'command' and item_str in featureSectionItem[1]:
-#                        print(featureName + ':\n' + featureSectionName)
-#                        print(featureSectionItem)
                         ret_bool = True
                         ret_feature_names.append(featureName)
         return ret_bool, ret_feature_names
 
-    # Note Anton: the oiginal method comes from vulkandocs/scripts/generator.py
+    # NOTE Anton: the oiginal method comes from vulkandocs/scripts/generator.py
     def genType(self, typeinfo, name, alias):
         """Generate interface for a type
 
@@ -1919,34 +2041,63 @@ REPLACEMENT_MAP = {{\n    {}\n}}".format(key_strings))
         Extend to generate as desired in your derived class."""
         self.validateFeature('type', name)
 
+        typeElem = typeinfo.elem
+        category = typeElem.get('category')
+
+        # Normalize API version-style defines early so they do not fall through
+        # into generic alias handling like `pub type API_VERSION_1_2 = voidptr`.
+        if category == 'define' and name and re.match(r'^VK(?:SC)?_API_VERSION(?:_[0-9_]+)?$|^VK_HEADER_VERSION_COMPLETE$', name):
+            c_section, c_body = self.genCType(typeinfo, name, alias) or ('define', '')
+            body = ''
+            if 'VK_MAKE_API_VERSION' in c_body:
+                m = re.search(r'(VK(?:SC)?_API_VERSION(?:_[0-9_]+)?|VK_HEADER_VERSION_COMPLETE)\s+VK_MAKE_API_VERSION\(([^\)]*)\)(.*)', c_body, re.DOTALL)
+                if m:
+                    raw_name = m.group(1).strip()
+                    args = [arg.strip() for arg in m.group(2).split(',')]
+                    trailing = m.group(3).rstrip()
+                    v_name = self.removeVk(raw_name).lower()
+                    if raw_name == 'VK_HEADER_VERSION_COMPLETE':
+                        args = ['header_version' if a == 'VK_HEADER_VERSION' else a for a in args]
+                    body = f'pub const {v_name} = make_api_version({", ".join(args)})'
+                    if trailing:
+                        body += trailing
+            # The XML has a commented-out VK_API_VERSION define; suppress it and any
+            # unparsed API version pseudo-types rather than emitting bogus aliases.
+            if body:
+                self.appendSection('define', body)
+            return
+
+        # Structs/unions are emitted exclusively via genStruct().
+        # They must not flow through the generic genCType/genVType path,
+        # otherwise they get emitted twice and V reports duplicate aliases.
+        if category in ('struct', 'union'):
+            self.genStruct(typeinfo, name, alias, keep_vk_member_name=True)
+            return
+
         body = ''
         section = ''
         cur_type = self.genCType(typeinfo, name, alias)
-        if cur_type is None or not cur_type or cur_type[1].startswith('// DEPRECATED:'):
+        if cur_type is None or not cur_type:
+            cur_type = self.genVType(typeinfo, name, alias)
+            if cur_type is None or not cur_type:
+                return
+            v_section, v_body = cur_type
+            self.appendSection(v_section, v_body)
+            return
+        if cur_type[1].startswith('// DEPRECATED:'):
             return
         c_section, c_body = cur_type
-
-        # Add text to REPLACEMENT_EXACT_TEXT_ARR if it contains something from REPLACEMENT_CONTAINS_ARR
-        # Later used to find exactly matching C code and replace it with V code
-        esc_text = self.escStr(c_body)
-        for contains_str in self.REPLACEMENT_CONTAINS_ARR:
-            if contains_str in c_body:
-                self.REPLACEMENT_EXACT_TEXT_ARR.append(esc_text)
 
         cur_type = self.genVType(typeinfo, name, alias)
         if cur_type is None or not cur_type:
             #NOTE: this is where #include is usually handled. Don't need it for V
             # and typedef
-#            body = c_body
-#            section = c_section
-#
-#            self.appendSection(c_section, c_body)
             return
 
         v_section, v_body = cur_type
 
-        if c_body in self.REPLACEMENT_MAP:
-            body = self.REPLACEMENT_MAP[c_body]
+        if '#define VK_DEFINE_HANDLE(object) typedef struct object##_T* object;' in c_body:
+            body = ''
             section = c_section
         else:
             body = v_body
@@ -1957,7 +2108,7 @@ REPLACEMENT_MAP = {{\n    {}\n}}".format(key_strings))
         if c_body.startswith('// Version of this file\n#define VK_HEADER_VERSION '):
             version_index = c_body.index('VK_HEADER_VERSION') + len('VK_HEADER_VERSION') + 1
             body = 'pub const header_version = ' + c_body[version_index:-1]
-        
+
         # Handle some of the version functions
         if '#define VK_MAKE_VERSION(major, minor, patch)' in c_body:
             body = '''
@@ -1985,6 +2136,22 @@ pub fn version_patch(version u32) u32 {
 pub fn make_api_version(variant u32, major u32, minor u32, patch u32) u32 {
   return (variant << 29) | (major << 22) | (minor << 12) | patch
 }'''
+        if 'VK_HEADER_VERSION_COMPLETE' in c_body and 'VK_MAKE_API_VERSION' in c_body:
+            import re as _re
+            _m = _re.search(r'VK_HEADER_VERSION_COMPLETE\s+VK_MAKE_API_VERSION\(([^,]+),\s*([^,]+),\s*([^,]+),\s*VK_HEADER_VERSION\)', c_body)
+            if _m:
+                body = f'pub const header_version_complete = make_api_version({_m.group(1).strip()}, {_m.group(2).strip()}, {_m.group(3).strip()}, header_version)'
+        if 'VK_API_VERSION_' in c_body and 'VK_MAKE_API_VERSION' in c_body:
+            import re as _re
+            _m = _re.search(r'(#define\s+)?(VKSC?_API_VERSION_[0-9_]+)\s+VK_MAKE_API_VERSION\(([^\)]*)\)(.*)', c_body, _re.DOTALL)
+            if _m:
+                raw_name = _m.group(2).strip()
+                args = [arg.strip() for arg in _m.group(3).split(',')]
+                comment = _m.group(4).rstrip()
+                v_name = self.removeVk(raw_name).lower()
+                body = f'pub const {v_name} = make_api_version({", ".join(args)})'
+                if comment:
+                    body += comment
         if 'API_VERSION_VARIANT(version)' in c_body:
             body = '''pub fn version_variant(version u32) u32 {
   return version >> 29
@@ -2009,30 +2176,26 @@ pub fn api_version_patch(version u32) u32 {
 pub fn make_video_std_version(major u32, minor u32, patch u32) u32 {
   return (major << 22) | (minor << 12) | patch
 }'''
-        # TODO: Version will change and new features will be added. Handle these with regex
-        if '#define VK_STD_VULKAN_VIDEO_CODEC_H264_DECODE_API_VERSION_1_0_0' in c_body:
-            body = '''pub const std_vulkan_video_codec_h264_decode_api_version_1_0_0 = make_video_std_version(1, 0, 0)'''    
-        if '#define VK_STD_VULKAN_VIDEO_CODEC_H264_ENCODE_API_VERSION_1_0_0' in c_body:
-            body = '''pub const std_vulkan_video_codec_h264_encode_api_version_1_0_0 = make_video_std_version(1, 0, 0)'''
-        if '#define VK_STD_VULKAN_VIDEO_CODEC_H265_DECODE_API_VERSION_1_0_0' in c_body:
-            body = '''pub const std_vulkan_video_codec_h265_decode_api_version_1_0_0 = make_video_std_version(1, 0, 0)'''
-        if '#define VK_STD_VULKAN_VIDEO_CODEC_H265_ENCODE_API_VERSION_1_0_0' in c_body:
-            body = '''pub const std_vulkan_video_codec_h265_encode_api_version_1_0_0 = make_video_std_version(1, 0, 0)'''
-        if '#define VK_STD_VULKAN_VIDEO_CODEC_AV1_DECODE_API_VERSION_1_0_0' in c_body:
-            body = '''pub const std_vulkan_video_codec_av1_decode_api_version_1_0_0 = make_video_std_version(1, 0, 0)'''
-        if '#define VK_STD_VULKAN_VIDEO_CODEC_AV1_ENCODE_API_VERSION_1_0_0' in c_body:
-            body = '''pub const std_vulkan_video_codec_av1_encode_api_version_1_0_0 = make_video_std_version(1, 0, 0)'''
-        if '#define VK_STD_VULKAN_VIDEO_CODEC_VP9_DECODE_API_VERSION_1_0_0' in c_body:
-            body = '''pub const std_vulkan_video_codec_vp9_decode_api_version_1_0_0 = make_video_std_version(1, 0, 0)'''
-        #body = self.STD_VIDEO_MAKE_VERSION_REGEX.sub(r'pub const std_vulkan_video_codec\L\1\Eapi_version_\2_\3_\4 = make_video_std_version(\2, \3, \4)',  c_body)
-        
+        video_std_api_version_body = self.build_video_std_api_version_const(c_body)
+        if video_std_api_version_body is not None:
+            body = video_std_api_version_body
+
         self.appendSection(section, body)
 
-    # NOTE Anton: If text contains `\` before new line, the mapping isn't found. This fixes it
+
+    def build_video_std_api_version_const(self, c_body):
+        match = re.search(r'#define\s+VK_STD_VULKAN_VIDEO_CODEC_(\w+)_API_VERSION_(\d+)_(\d+)_(\d+)', c_body)
+        if not match:
+            return None
+        codec_name = match.group(1).lower()
+        major, minor, patch = match.group(2), match.group(3), match.group(4)
+        return f'pub const std_vulkan_video_codec_{codec_name}_api_version_{major}_{minor}_{patch} = make_video_std_version({major}, {minor}, {patch})'
+
+    # If text contains `\` before new line, the mapping isn't found. This fixes it
     def escStr(self, text) -> str:
         return text.replace(r'\\', '\\\\').replace(r'\n', '\\n')
 
-    # Note Anton: the oiginal method comes from vulkandocs/scripts/generator.py
+    # NOTE Anton: the oiginal method comes from vulkandocs/scripts/generator.py
     def deprecationComment(self, elem, indent = 0):
         """If an API element is marked deprecated, return a brief comment
            describing why.
@@ -2058,17 +2221,17 @@ pub fn make_video_std_version(major u32, minor u32, patch u32) u32 {
             name = elem.get('name')
 
         if reason == 'aliased':
-            return f'{padding}// {name} is a deprecated alias\n'
-        elif reason == 'ignored':
-            return f'{padding}// {name} is deprecated and should not be used\n'
+            return f'{padding}// {name} is a legacy alias\n'
+        elif reason == 'unused':
+            return f'{padding}// {name} is legacy and not used\n'
         elif reason == 'true':
-            return f'{padding}// {name} is deprecated, but no reason was given in the API XML\n'
+            return f'{padding}// {name} is legacy, but no reason was given in the API XML\n'
         else:
             # This can be caught by schema validation
-            self.logMsg('error', f"{name} has an unknown deprecation attribute value '{reason}'")
+            self.logMsg('error', f"{name} has an unknown legacy attribute value '{reason}'")
             exit(1)
 
-    # Note Anton: the oiginal method comes from vulkandocs/scripts/generator.py
+    # NOTE Anton: the oiginal method comes from vulkandocs/scripts/generator.py
     def genRequirements(self, name, mustBeFound = True, indent = 0):
         """Generate text showing what core versions and extensions introduce
         an API. This exists in the base Generator class because it is used by
