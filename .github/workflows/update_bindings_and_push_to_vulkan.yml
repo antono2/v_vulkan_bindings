@@ -87,9 +87,10 @@ jobs:
       - name: Download Volk and compile smoke test
         run: |
           set -euo pipefail
-          install -d "$VULKAN_SDK/include/volk"
+          install -d "$VULKAN_SDK/include/volk" "$HOME/.vmodules"
           curl --fail --silent --show-error --location https://raw.githubusercontent.com/zeux/volk/master/volk.h --output "$VULKAN_SDK/include/volk/volk.h"
           curl --fail --silent --show-error --location https://raw.githubusercontent.com/zeux/volk/master/volk.c --output "$VULKAN_SDK/include/volk/volk.c"
+          ln -s "$GITHUB_WORKSPACE/src" "$HOME/.vmodules/vulkan"
           v -cc gcc run test
       - uses: actions/upload-artifact@v7
         with:
