@@ -1,4 +1,4 @@
-name: Update bindings and push to vulkan
+name: Propose Vulkan binding update
 
 on:
   schedule:
@@ -31,15 +31,23 @@ jobs:
       - id: versions
         env:
           REQUESTED_VERSION: ${{ inputs.vk_docs_version }}
+          TARGET_VERSION_URL: https://raw.githubusercontent.com/antono2/vulkan/master/VERSION
         run: |
           set -euo pipefail
-          current=$(cat VERSION)
+          current=$(curl --fail --silent --show-error --location "$TARGET_VERSION_URL")
           requested=$REQUESTED_VERSION
           if [[ -z "$requested" ]]; then
             requested=$(curl --fail --silent --show-error --location \
               https://api.github.com/repos/KhronosGroup/Vulkan-Docs/tags | jq -er '.[0].name')
           fi
-          [[ "$requested" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || exit 1
+          [[ "$current" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
+            echo "Invalid published version: $current" >&2
+            exit 1
+          }
+          [[ "$requested" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
+            echo "Invalid requested version: $requested" >&2
+            exit 1
+          }
           changed=true
           [[ "$current" == "$requested" ]] && changed=false
           echo "requested=$requested" >> "$GITHUB_OUTPUT"
@@ -88,7 +96,7 @@ jobs:
             src/vulkan_video.v
             VERSION
 
-  deploy:
+  propose:
     needs: [versions, generate]
     runs-on: ubuntu-latest
     steps:
@@ -101,9 +109,9 @@ jobs:
         with:
           name: v-vulkan-bindings-${{ needs.versions.outputs.requested }}
           path: generated
-      - name: Commit and tag generated module
+      - name: Commit generated module to a release branch
         env:
-          RELEASE_TAG: ${{ needs.versions.outputs.requested }}
+          BRANCH_NAME: generated/${{ needs.versions.outputs.requested }}
         run: |
           set -euo pipefail
           test -f c/volk.c.v
@@ -112,32 +120,42 @@ jobs:
           install -m 0644 generated/VERSION VERSION
           git diff --check
           git add vulkan.v vulkan_video.v VERSION
-          if git diff --cached --quiet; then exit 0; fi
-          if git ls-remote --exit-code --tags origin "refs/tags/$RELEASE_TAG" >/dev/null 2>&1; then
-            echo "Refusing to replace existing tag $RELEASE_TAG" >&2
-            exit 1
-          fi
+          git diff --cached --quiet && {
+            echo "Generated files already match master"
+            exit 0
+          }
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -m "Generated bindings $RELEASE_TAG"
-          git tag -a "$RELEASE_TAG" -m "V bindings for Vulkan-Docs $RELEASE_TAG"
-          git push --atomic origin HEAD:master "refs/tags/$RELEASE_TAG"
+          git commit -m "Generated bindings ${{ needs.versions.outputs.requested }}"
 
-  update-source-version:
-    needs: [versions, deploy]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          ref: master
-          token: ${{ secrets.PUSH_VULKAN }}
-      - name: Commit generator version
+          remote_ref="refs/heads/$BRANCH_NAME"
+          remote_sha=$(git ls-remote origin "$remote_ref" | awk '{print $1}')
+          if [[ -n "$remote_sha" ]]; then
+            git push --force-with-lease="$remote_ref:$remote_sha" origin "HEAD:$remote_ref"
+          else
+            git push origin "HEAD:$remote_ref"
+          fi
+      - name: Open or update pull request
+        env:
+          BRANCH_NAME: generated/${{ needs.versions.outputs.requested }}
+          GH_TOKEN: ${{ secrets.PUSH_VULKAN }}
+          RELEASE_VERSION: ${{ needs.versions.outputs.requested }}
         run: |
           set -euo pipefail
-          printf '%s\n' '${{ needs.versions.outputs.requested }}' > VERSION
-          git add VERSION
-          if git diff --cached --quiet; then exit 0; fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -m "Update VERSION to ${{ needs.versions.outputs.requested }}"
-          git push origin HEAD:master
+          existing=$(gh pr list \
+            --repo "$DEPLOY_TARGET_REPO" \
+            --base master \
+            --head "$BRANCH_NAME" \
+            --state open \
+            --json number \
+            --jq '.[0].number // empty')
+          if [[ -n "$existing" ]]; then
+            echo "Updated existing pull request #$existing"
+            exit 0
+          fi
+          gh pr create \
+            --repo "$DEPLOY_TARGET_REPO" \
+            --base master \
+            --head "$BRANCH_NAME" \
+            --title "Generated bindings $RELEASE_VERSION" \
+            --body "Automated bindings generated from KhronosGroup/Vulkan-Docs tag \`$RELEASE_VERSION\`. The release tag will be created after this pull request is merged and the target module passes its validation workflow."
