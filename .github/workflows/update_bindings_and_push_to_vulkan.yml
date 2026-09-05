@@ -62,6 +62,10 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/checkout@v7
         with:
+          repository: ${{ env.DEPLOY_TARGET_REPO }}
+          path: published
+      - uses: actions/checkout@v7
+        with:
           repository: KhronosGroup/Vulkan-Docs
           path: vulkandocs
           ref: ${{ needs.versions.outputs.requested }}
@@ -90,7 +94,9 @@ jobs:
           install -d "$VULKAN_SDK/include/volk" "$HOME/.vmodules"
           curl --fail --silent --show-error --location https://raw.githubusercontent.com/zeux/volk/master/volk.h --output "$VULKAN_SDK/include/volk/volk.h"
           curl --fail --silent --show-error --location https://raw.githubusercontent.com/zeux/volk/master/volk.c --output "$VULKAN_SDK/include/volk/volk.c"
-          ln -s "$GITHUB_WORKSPACE/src" "$HOME/.vmodules/vulkan"
+          install -m 0644 src/vulkan.v published/vulkan.v
+          install -m 0644 src/vulkan_video.v published/vulkan_video.v
+          ln -s "$GITHUB_WORKSPACE/published" "$HOME/.vmodules/vulkan"
           v -cc gcc run test
       - uses: actions/upload-artifact@v7
         with:

@@ -376,6 +376,20 @@ SOFTWARE.
             write('module', 'vulkan', file=self.outFile)
             self.newline()
 
+            # The primary Vulkan module owns the Volk implementation through
+            # its hand-written vulkan.c submodule. Keep this integration in
+            # generated output so publishing new bindings cannot remove it.
+            if self.genOpts.filename.endswith('/vulkan.v'):
+                write('''import vulkan.c as _
+
+// Volk owns the Vulkan loader dispatch table used by this binding. Keep the
+// declarations next to the public Vulkan types, while the implementation is
+// compiled exactly once in c/volk.c.v.
+fn C.volkInitialize() Result
+fn C.volkLoadInstance(Instance)
+fn C.volkLoadDevice(Device)''', file=self.outFile)
+                self.newline()
+
         # User-supplied prefix text, if any (list of strings)
         if genOpts.prefixText:
             for s in genOpts.prefixText:
