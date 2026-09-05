@@ -35,7 +35,20 @@ from generator import (GeneratorOptions,
                        MissingGeneratorOptionsConventionsError,
                        MissingGeneratorOptionsError, MissingRegistryError,
                        OutputGenerator, noneStr,
-                       write, genProtectDirective)
+                       write)
+
+try:
+    from generator import genProtectDirective
+except ImportError:
+    # Vulkan-Docs before boolean protect expressions exposed no shared helper.
+    def genProtectDirective(protect_str):
+        if not protect_str:
+            return ('', '')
+        protect_list = protect_str.split(',')
+        if len(protect_list) > 1:
+            condition = ' || '.join(f'defined({item})' for item in protect_list)
+            return (f'#if {condition}', '#endif')
+        return (f'#ifdef {protect_str}', '#endif')
 
 class VGeneratorOptions(GeneratorOptions):
     """VGeneratorOptions - subclass of GeneratorOptions.
@@ -1059,7 +1072,7 @@ fn C.volkLoadDevice(Device)''', file=self.outFile)
         typeElem = typeinfo.elem
         proto = typeElem.find('proto')
         if proto is None:
-            return None
+            return self.build_legacy_funcpointer_type_decl(typeElem, name)
         proto_name_elem = proto.find('name')
         proto_type_elem = proto.find('type')
         v_name = noneStr(proto_name_elem.text if proto_name_elem is not None else name).strip()
@@ -1090,6 +1103,35 @@ fn C.volkLoadDevice(Device)''', file=self.outFile)
             body += f' {return_type}'
         body += '\n'
         return ('struct', body)
+
+    def build_legacy_funcpointer_type_decl(self, typeElem, name):
+        """Read the flat funcpointer representation used by older registries."""
+        name_elem = typeElem.find('name')
+        v_name = noneStr(name_elem.text if name_elem is not None else name).strip()
+        match = re.match(r'\s*typedef\s+(.+?)\s*\(VKAPI_PTR\s*\*', noneStr(typeElem.text))
+        if not v_name or match is None:
+            return None
+        return_type = self.translate_xml_decl_type_to_v_type(match.group(1))
+
+        params = []
+        for type_elem in typeElem.findall('type'):
+            tail = noneStr(type_elem.tail)
+            pointer_suffix = '*' * tail.count('*')
+            names = re.findall(r'[A-Za-z_][A-Za-z0-9_]*', tail.replace('const', ''))
+            if not names:
+                continue
+            param_name = names[-1]
+            param_type = self.translate_xml_decl_type_to_v_type(
+                noneStr(type_elem.text), pointer_suffix)
+            if not param_type:
+                param_type = 'voidptr'
+            params.append(f'{param_name} {param_type}')
+
+        params_block = '(' + ', '.join(params) + ')' if params else '()'
+        body = f'pub type {v_name} = fn {params_block}'
+        if return_type:
+            body += f' {return_type}'
+        return ('struct', body + '\n')
 
     def genCmd(self, cmdinfo, name, alias):
         "Command generation"
@@ -2177,7 +2219,7 @@ pub fn make_video_std_version(major u32, minor u32, patch u32) u32 {
 
         if reason == 'aliased':
             return f'{padding}// {name} is a legacy alias\n'
-        elif reason == 'unused':
+        elif reason in ('ignored', 'unused'):
             return f'{padding}// {name} is legacy and not used\n'
         elif reason == 'true':
             return f'{padding}// {name} is legacy, but no reason was given in the API XML\n'
