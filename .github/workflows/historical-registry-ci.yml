@@ -4,6 +4,8 @@ on:
   pull_request:
     branches: [master]
     paths:
+      - README.md
+      - scripts/generate.sh
       - src/**
       - test/**
       - .github/workflows/historical-registry-ci.yml
@@ -47,10 +49,7 @@ jobs:
         run: |
           set -euo pipefail
           echo "Compiler: $(v version)"
-          python src/main.py -registry vulkandocs/xml/vk.xml vulkan.v
-          python src/main.py -registry vulkandocs/xml/video.xml vulkan_video.v
-          v fmt -w src/vulkan.v
-          v fmt -w src/vulkan_video.v
+          ./scripts/generate.sh "$VERSION"
           install -m 0644 src/vulkan.v published/vulkan.v
           install -m 0644 src/vulkan_video.v published/vulkan_video.v
           printf '%s\n' "$VERSION" > published/VERSION
@@ -63,4 +62,3 @@ jobs:
             --output "$VULKAN_SDK/include/volk/volk.c"
           ln -s "$GITHUB_WORKSPACE/published" "$HOME/.vmodules/vulkan"
           v -cc gcc run test
-
