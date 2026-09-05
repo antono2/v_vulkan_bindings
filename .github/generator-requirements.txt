@@ -1,0 +1,2 @@
+# Required by the Vulkan-Docs registry scripts imported by src/main.py.
+pyparsing>=3.2,<4

@@ -62,6 +62,10 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/checkout@v7
         with:
+          repository: ${{ env.DEPLOY_TARGET_REPO }}
+          path: published
+      - uses: actions/checkout@v7
+        with:
           repository: KhronosGroup/Vulkan-Docs
           path: vulkandocs
           ref: ${{ needs.versions.outputs.requested }}
@@ -69,6 +73,10 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: "3.x"
+          cache: pip
+          cache-dependency-path: .github/generator-requirements.txt
+      - name: Install generator dependencies
+        run: python -m pip install --requirement .github/generator-requirements.txt
       - name: Generate bindings
         run: |
           set -euo pipefail
@@ -83,9 +91,12 @@ jobs:
       - name: Download Volk and compile smoke test
         run: |
           set -euo pipefail
-          install -d "$VULKAN_SDK/include/volk"
+          install -d "$VULKAN_SDK/include/volk" "$HOME/.vmodules"
           curl --fail --silent --show-error --location https://raw.githubusercontent.com/zeux/volk/master/volk.h --output "$VULKAN_SDK/include/volk/volk.h"
           curl --fail --silent --show-error --location https://raw.githubusercontent.com/zeux/volk/master/volk.c --output "$VULKAN_SDK/include/volk/volk.c"
+          install -m 0644 src/vulkan.v published/vulkan.v
+          install -m 0644 src/vulkan_video.v published/vulkan_video.v
+          ln -s "$GITHUB_WORKSPACE/published" "$HOME/.vmodules/vulkan"
           v -cc gcc run test
       - uses: actions/upload-artifact@v7
         with:
