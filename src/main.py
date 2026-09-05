@@ -5,6 +5,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import argparse
+import inspect
 import os
 import pathlib
 import pdb
@@ -19,6 +20,7 @@ sys.path.append(str(vk_script_path))
 os.chdir(vk_script_path)
 
 from vgenerator import VGeneratorOptions, VOutputGenerator
+from generator import GeneratorOptions
 from reflib import logDiag, logErr, setLogFile
 from reg import Registry
 from apiconventions import APIConventions
@@ -98,6 +100,8 @@ def makeGenOpts(args):
         misracstyle=False,
         misracppstyle=False,
     )
+    if 'mergeInternalApis' in inspect.signature(GeneratorOptions.__init__).parameters:
+        v_common['mergeInternalApis'] = not args.no_internal_api_merging
 
     genOpts['vulkan.v'] = [
         VOutputGenerator,
@@ -182,6 +186,8 @@ if __name__ == '__main__':
                         help='Write errors and warnings to specified file instead of stderr')
     parser.add_argument('-noprotect', dest='protect', action='store_false',
                         help='Disable inclusion protection in output headers')
+    parser.add_argument('-no-internal-api-merging', action='store_true',
+                        help='Read registries from before internal API features were introduced')
     parser.add_argument('-registry', action='store', default='../xml/vk.xml',
                         help='Use specified registry file instead of vk.xml')
     parser.add_argument('-time', action='store_true', help='Enable timing')
@@ -218,6 +224,16 @@ if __name__ == '__main__':
     args_registry = '../../' + args.registry
     startTimer(args.time)
     tree = etree.parse(args_registry)
+    # Older registries put a funcpointer's name directly under <type>.
+    # Current Khronos registry helpers expect the newer <proto><name> form,
+    # but a name attribute is supported by both representations.
+    for type_elem in tree.getroot().findall('types/type'):
+        if (type_elem.get('category') == 'funcpointer'
+                and type_elem.get('name') is None
+                and type_elem.find('proto/name') is None):
+            legacy_name = type_elem.findtext('name')
+            if legacy_name:
+                type_elem.set('name', legacy_name)
     endTimer(args.time, '* Time to make ElementTree =')
 
     startTimer(args.time)
