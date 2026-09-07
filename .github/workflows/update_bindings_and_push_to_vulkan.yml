@@ -91,12 +91,12 @@ jobs:
       - name: Download Volk and compile smoke test
         run: |
           set -euo pipefail
-          install -d "$VULKAN_SDK/include/volk" "$HOME/.vmodules"
+          install -d "$VULKAN_SDK/include/volk" "$HOME/.vmodules/antono2"
           curl --fail --silent --show-error --location https://raw.githubusercontent.com/zeux/volk/master/volk.h --output "$VULKAN_SDK/include/volk/volk.h"
           curl --fail --silent --show-error --location https://raw.githubusercontent.com/zeux/volk/master/volk.c --output "$VULKAN_SDK/include/volk/volk.c"
           install -m 0644 src/vulkan.v published/vulkan.v
           install -m 0644 src/vulkan_video.v published/vulkan_video.v
-          ln -s "$GITHUB_WORKSPACE/published" "$HOME/.vmodules/vulkan"
+          ln -s "$GITHUB_WORKSPACE/published" "$HOME/.vmodules/antono2/vulkan"
           v -cc gcc run test
       - uses: actions/upload-artifact@v7
         with:

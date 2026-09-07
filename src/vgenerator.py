@@ -26,7 +26,7 @@
 
 
 # This file is invoked by passing a generator parameter `vulkan.v` or `vulkan_video.v`.
-# It produces `src/vulkan.v` or `src/vulkan_video.v`, which then can be copied to your local .vmodules/vulkan directory.
+# It produces `src/vulkan.v` or `src/vulkan_video.v`, which then can be copied to your local .vmodules/antono2/vulkan directory.
 
 import re
 import string

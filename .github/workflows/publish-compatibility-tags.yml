@@ -46,14 +46,14 @@ jobs:
         run: |
           set -euo pipefail
           echo "Compiler: $(v version)"
-          install -d "$VULKAN_SDK/include/volk" "$HOME/.vmodules"
+          install -d "$VULKAN_SDK/include/volk" "$HOME/.vmodules/antono2"
           curl --fail --silent --show-error --location \
             https://raw.githubusercontent.com/zeux/volk/master/volk.h \
             --output "$VULKAN_SDK/include/volk/volk.h"
           curl --fail --silent --show-error --location \
             https://raw.githubusercontent.com/zeux/volk/master/volk.c \
             --output "$VULKAN_SDK/include/volk/volk.c"
-          ln -s "$GITHUB_WORKSPACE/published" "$HOME/.vmodules/vulkan"
+          ln -s "$GITHUB_WORKSPACE/published" "$HOME/.vmodules/antono2/vulkan"
           git -C published config user.name "github-actions[bot]"
           git -C published config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
