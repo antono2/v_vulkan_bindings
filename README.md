@@ -1,4 +1,6 @@
 # v_vulkan_bindings
+[Project portfolio](https://oreskin.de/projects_en.php) · [Support independent development](https://oreskin.de/dono_en.php)
+
 Generates the [vulkan bindings](https://github.com/antono2/vulkan) for [V](https://vlang.io/) from the current [KhronosGroup](https://github.com/KhronosGroup/) [API description](https://github.com/KhronosGroup/Vulkan-Docs/blob/main/xml/vk.xml).
 
 ## Quick start
