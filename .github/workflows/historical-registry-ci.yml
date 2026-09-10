@@ -3,12 +3,6 @@ name: Historical registry compatibility
 on:
   pull_request:
     branches: [master]
-    paths:
-      - README.md
-      - scripts/generate.sh
-      - src/**
-      - test/**
-      - .github/workflows/historical-registry-ci.yml
   workflow_dispatch:
 
 permissions:
@@ -62,3 +56,13 @@ jobs:
             --output "$VULKAN_SDK/include/volk/volk.c"
           ln -s "$GITHUB_WORKSPACE/published" "$HOME/.vmodules/antono2/vulkan"
           v -cc gcc run test
+
+  required-checks:
+    if: always()
+    needs: [generate-and-compile]
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Verify historical registry matrix
+        env:
+          MATRIX_RESULT: ${{ needs.generate-and-compile.result }}
+        run: test "$MATRIX_RESULT" = success
