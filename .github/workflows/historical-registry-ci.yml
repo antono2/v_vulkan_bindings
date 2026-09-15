@@ -9,6 +9,29 @@ permissions:
   contents: read
 
 jobs:
+  windows-generator:
+    name: Windows generator setup
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.x"
+          cache: pip
+          cache-dependency-path: .github/generator-requirements.txt
+      - uses: prantlf/setup-v-action@v4
+      - name: Generate pinned bindings with PowerShell
+        shell: pwsh
+        run: |
+          ./scripts/generate.ps1
+          git diff --check
+          if (-not (Test-Path -LiteralPath src/vulkan.v -PathType Leaf)) {
+            throw 'Vulkan bindings were not generated'
+          }
+          if (-not (Test-Path -LiteralPath src/vulkan_video.v -PathType Leaf)) {
+            throw 'Vulkan Video bindings were not generated'
+          }
+
   generate-and-compile:
     name: Vulkan-Docs ${{ matrix.version }}
     strategy:
@@ -59,10 +82,13 @@ jobs:
 
   required-checks:
     if: always()
-    needs: [generate-and-compile]
+    needs: [windows-generator, generate-and-compile]
     runs-on: ubuntu-24.04
     steps:
       - name: Verify historical registry matrix
         env:
+          WINDOWS_RESULT: ${{ needs.windows-generator.result }}
           MATRIX_RESULT: ${{ needs.generate-and-compile.result }}
-        run: test "$MATRIX_RESULT" = success
+        run: |
+          test "$WINDOWS_RESULT" = success
+          test "$MATRIX_RESULT" = success

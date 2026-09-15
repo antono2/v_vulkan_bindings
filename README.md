@@ -24,10 +24,22 @@ cd v_vulkan_bindings
 ./scripts/generate.sh
 ```
 
+On Windows, run the equivalent PowerShell script:
+
+```powershell
+git clone https://github.com/antono2/v_vulkan_bindings.git
+Set-Location v_vulkan_bindings
+.\scripts\generate.ps1
+```
+
 Pass a Vulkan-Docs tag to generate a different registry release:
 
 ```bash
 ./scripts/generate.sh v1.4.362
+```
+
+```powershell
+.\scripts\generate.ps1 v1.4.362
 ```
 
 The script refuses to switch an existing `vulkandocs` checkout if it contains
