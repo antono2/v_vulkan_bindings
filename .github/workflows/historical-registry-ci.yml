@@ -13,13 +13,13 @@ jobs:
     name: Windows generator setup
     runs-on: windows-2022
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
           python-version: "3.x"
           cache: pip
           cache-dependency-path: .github/generator-requirements.txt
-      - uses: prantlf/setup-v-action@v4
+      - uses: prantlf/setup-v-action@92f20bea50d2c9931a28c96bb4997a3c7357baf0 # v4
       - name: Generate pinned bindings with PowerShell
         shell: pwsh
         run: |
@@ -36,35 +36,35 @@ jobs:
     name: Strict V3 frontend
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           repository: KhronosGroup/Vulkan-Docs
           ref: v1.4.362
           path: vulkandocs
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           repository: antono2/vulkan
           path: published
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           repository: vlang/v
           ref: f59b886d2564e37d8626d715236fdfa928e13dda
           path: .ci-v-source
           fetch-depth: 1
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           repository: vlang/vc
           ref: 4598bc7e4894c154b27391e4442005fff2fbbd68
           path: .ci-v-source/vc
           fetch-depth: 1
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           repository: vlang/tccbin
           ref: d6e7ac1b1bcc98aed734a6ecbfa8509f24606c74
           path: .ci-v-source/thirdparty/tcc
           fetch-depth: 1
-      - uses: actions/setup-python@v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
           python-version: "3.x"
           cache: pip
@@ -104,24 +104,24 @@ jobs:
         version: [v1.3.290, v1.4.319, v1.4.335, v1.4.362]
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           repository: KhronosGroup/Vulkan-Docs
           ref: ${{ matrix.version }}
           path: vulkandocs
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           repository: antono2/vulkan
           path: published
-      - uses: prantlf/setup-v-action@v4
-      - uses: actions/setup-python@v7
+      - uses: prantlf/setup-v-action@92f20bea50d2c9931a28c96bb4997a3c7357baf0 # v4
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
           python-version: "3.x"
           cache: pip
           cache-dependency-path: .github/generator-requirements.txt
       - run: python -m pip install --requirement .github/generator-requirements.txt
-      - uses: NcStudios/VulkanCI@v1.2
+      - uses: NcStudios/VulkanCI@1a5db3ebde578c503b1d7f8df007e42a7367224c # v1.2
         with:
           sdkVersion: 1.4.309.0
       - name: Generate and compile historical bindings
