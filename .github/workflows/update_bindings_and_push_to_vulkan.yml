@@ -178,4 +178,4 @@ jobs:
             --base master \
             --head "$BRANCH_NAME" \
             --title "Generated bindings $RELEASE_VERSION" \
-            --body "Automated bindings generated from KhronosGroup/Vulkan-Docs tag \`$RELEASE_VERSION\`. The release tag will be created after this pull request is merged and the target module passes its validation workflow."
+            --body "Automated bindings generated from KhronosGroup/Vulkan-Docs tag \`$RELEASE_VERSION\`. Once merged, this registry snapshot is available from the target module's master branch. Package release tags follow the semantic version in \`v.mod\` and are created separately."
