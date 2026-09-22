@@ -49,13 +49,13 @@ jobs:
       - uses: actions/checkout@v7
         with:
           repository: vlang/v
-          ref: 239f06c1de4b6380b2c9d03eed023996951b2c74
+          ref: f59b886d2564e37d8626d715236fdfa928e13dda
           path: .ci-v-source
           fetch-depth: 1
       - uses: actions/checkout@v7
         with:
           repository: vlang/vc
-          ref: 21490f7811a2dd366c3daa39bef8e53c1e3e5727
+          ref: 4598bc7e4894c154b27391e4442005fff2fbbd68
           path: .ci-v-source/vc
           fetch-depth: 1
       - uses: actions/checkout@v7
