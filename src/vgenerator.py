@@ -316,6 +316,13 @@ class VOutputGenerator(OutputGenerator):
         'ubm_surface': 'voidptr',
     }
 
+    # Objective-C object and IOSurface typedefs are pointer-sized opaque C
+    # handles. Their registry names are not V struct values.
+    OPAQUE_PLATFORM_HANDLE_TYPES = {
+        'MTLDevice_id', 'MTLCommandQueue_id', 'MTLBuffer_id',
+        'MTLTexture_id', 'MTLSharedEvent_id', 'IOSurfaceRef',
+    }
+
     # Contains all struct handles in vulkan.
     # They are pointers to StructName_T and their members are unknown.
     C_STRUCT_ARR = []
@@ -1461,6 +1468,9 @@ fn C.volkLoadDevice(Device)''', file=self.outFile)
                 self.fixed_array_aliases.append((alias_name, v_type))
                 v_type = alias_name
 
+            if do_struct_members and v_type in self.OPAQUE_PLATFORM_HANDLE_TYPES:
+                v_type = 'voidptr'
+
             v_name = self.make_v_param_name(
                 param,
                 v_name,
@@ -1771,6 +1781,8 @@ fn C.volkLoadDevice(Device)''', file=self.outFile)
                 name = self.removeVk(name).lower()
 
             name = self.removeStructEnumNameFromMember(groupName,  name)
+            if name == 'or':
+                name = 'or_'
 
             # Extension enumerants are only included if they are required
             if self.isEnumRequired(elem):
