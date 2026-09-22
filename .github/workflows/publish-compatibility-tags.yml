@@ -27,6 +27,12 @@ jobs:
           path: vulkandocs
       - uses: actions/checkout@v7
         with:
+          repository: KhronosGroup/Vulkan-Headers
+          fetch-depth: 0
+          filter: blob:none
+          path: vulkanheaders
+      - uses: actions/checkout@v7
+        with:
           repository: ${{ env.TARGET_REPO }}
           fetch-depth: 0
           path: published
@@ -61,18 +67,22 @@ jobs:
             git -C published tag --list --sort=version:refname |
               grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$'
           )
-          current=$(cat published/VERSION)
           tag_refs=()
-          for version in "${versions[@]}"; do
-            [[ "$version" == "$current" ]] && continue
-            compat_tag="$version+vcompat.$COMPATIBILITY_REVISION"
+          for package_tag in "${versions[@]}"; do
+            registry_version=$(git -C published show "$package_tag:VERSION" | tr -d '\r\n')
+            [[ "$registry_version" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
+              echo "Invalid registry version in $package_tag: $registry_version" >&2
+              exit 1
+            }
+            compat_tag="$package_tag+vcompat.$COMPATIBILITY_REVISION"
             if git -C published rev-parse --verify --quiet "refs/tags/$compat_tag" >/dev/null; then
               echo "Already published: $compat_tag"
               continue
             fi
 
-            echo "Generating $compat_tag"
-            git -C vulkandocs checkout --quiet --detach --force "refs/tags/$version"
+            echo "Generating $compat_tag from Vulkan registry $registry_version"
+            git -C vulkandocs checkout --quiet --detach --force "refs/tags/$registry_version"
+            git -C vulkanheaders checkout --quiet --detach --force "refs/tags/$registry_version"
             python src/main.py -registry vulkandocs/xml/vk.xml vulkan.v
             python src/main.py -registry vulkandocs/xml/video.xml vulkan_video.v
             v fmt -w src/vulkan.v
@@ -81,12 +91,13 @@ jobs:
             git -C published switch --detach origin/master
             install -m 0644 src/vulkan.v published/vulkan.v
             install -m 0644 src/vulkan_video.v published/vulkan_video.v
-            printf '%s\n' "$version" > published/VERSION
+            printf '%s\n' "$registry_version" > published/VERSION
+            git -C vulkanheaders rev-parse HEAD > published/REGISTRY_COMMIT
             git -C published diff --check
-            git -C published add vulkan.v vulkan_video.v VERSION
-            git -C published commit -m "Regenerate $version for current V"
+            git -C published add vulkan.v vulkan_video.v VERSION REGISTRY_COMMIT
+            git -C published commit -m "Regenerate $package_tag for current V"
             v -cc gcc -o "$RUNNER_TEMP/vulkan-smoke" test
-            git -C published tag -a "$compat_tag" -m "$version bindings regenerated for current V"
+            git -C published tag -a "$compat_tag" -m "$package_tag bindings regenerated for current V"
             tag_refs+=("refs/tags/$compat_tag")
           done
 
