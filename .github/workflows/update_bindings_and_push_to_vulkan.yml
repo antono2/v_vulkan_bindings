@@ -108,6 +108,9 @@ jobs:
           git -C vulkanheaders rev-parse HEAD > REGISTRY_COMMIT
           grep -Eq '^[0-9a-f]{40}$' REGISTRY_COMMIT
       - uses: NcStudios/VulkanCI@1a5db3ebde578c503b1d7f8df007e42a7367224c # v1.2
+        env:
+          # VulkanCI uses github.action_ref as its release artifact tag.
+          VK_CI_TEST_TAG_OVERRIDE: v1.2
         with:
           sdkVersion: 1.4.309.0
       - name: Download Volk and compile smoke test
