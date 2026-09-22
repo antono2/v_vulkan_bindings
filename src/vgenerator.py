@@ -322,39 +322,13 @@ class VOutputGenerator(OutputGenerator):
 
     C_STRUCT_ARR_WITH_VK_PREFIX = []
 
-    # Used to find static C code, like #define VK_API_VERSION_MAJOR in appendSection
-    # The exact C code is then replaced in genType
-    REPLACEMENT_CONTAINS_ARR = [
-        'STD_VIDEO_DECODE_H264_FIELD_ORDER_COUNT_LIST_SIZE',
-        'VK_MAKE_VIDEO_STD_VERSION(major, minor, patch)',
-        'VK_STD_VULKAN_VIDEO_CODEC_H264_DECODE_API_VERSION_1_0_0',
-        '#define VK_STD_VULKAN_VIDEO_CODEC_H264_ENCODE_API_VERSION_1_0_0 VK_MAKE_VIDEO_STD_VERSION(1, 0, 0)',
-        '#define VK_STD_VULKAN_VIDEO_CODEC_H265_DECODE_API_VERSION_1_0_0 VK_MAKE_VIDEO_STD_VERSION(1, 0, 0)',
-        'VK_STD_VULKAN_VIDEO_CODEC_AV1_DECODE_API_VERSION_1_0_0',
-        'VK_STD_VULKAN_VIDEO_CODEC_AV1_ENCODE_API_VERSION_1_0_0',
-        '#define VK_DEFINE_HANDLE',
-        '\n#ifndef VK_DEFINE_NON_DISPATCHABLE_HANDLE\n    #if (VK_USE_64_BIT_PTR_DEFINES==1)\n        #if (defined(__cplusplus) && (__cplusplus >= 201103L)) || (defined(_MSVC_LANG) && (_MSVC_LANG >= 201103L))\n            #define VK_NULL_HANDLE nullptr\n        #else\n            #define VK_NULL_HANDLE ((void*)0)\n        #endif\n    #else\n        #define VK_NULL_HANDLE 0ULL\n    #endif\n#endif\n#ifndef VK_NULL_HANDLE\n    #define VK_NULL_HANDLE 0\n#endif',
-        '\n#ifndef VK_USE_64_BIT_PTR_DEFINES\n    #if defined(__LP64__) || defined(_WIN64) || (defined(__x86_64__) && !defined(__ILP32__) ) || defined(_M_X64) || defined(__ia64) || defined (_M_IA64) || defined(__aarch64__) || defined(__powerpc64__) || (defined(__riscv) && __riscv_xlen == 64)\n        #define VK_USE_64_BIT_PTR_DEFINES 1\n    #else\n        #define VK_USE_64_BIT_PTR_DEFINES 0\n    #endif\n#endif',
-        '\n#ifndef VK_DEFINE_NON_DISPATCHABLE_HANDLE\n    #if (VK_USE_64_BIT_PTR_DEFINES==1)\n        #define VK_DEFINE_NON_DISPATCHABLE_HANDLE(object) typedef struct object##_T *object;\n    #else\n        #define VK_DEFINE_NON_DISPATCHABLE_HANDLE(object) typedef uint64_t object;\n    #endif\n#endif',
-        '#define VK_MAKE_API_VERSION(variant, major, minor, patch)',
-        '#define VK_API_VERSION_1_0',
-        '#define VK_HEADER_VERSION_COMPLETE',
-        '#define VK_MAKE_VERSION',
-        '#define VK_VERSION_MAJOR',
-        '#define VK_VERSION_MINOR',
-        '#define VK_VERSION_PATCH',
-        '#define VK_API_VERSION_VARIANT',
-        '#define VK_API_VERSION_MAJOR',
-        '#define VK_API_VERSION_MINOR',
-        '#define VK_API_VERSION_PATCH',
-    ]
-
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # Internal state - accumulators for different inner block text
         self.sections = {section: [] for section in self.ALL_SECTIONS}
         self.feature_not_empty = False
         self.may_alias = None
+        self.fixed_array_aliases = []
 
     def beginFile(self, genOpts):
         OutputGenerator.beginFile(self, genOpts)
@@ -514,12 +488,6 @@ fn C.volkLoadDevice(Device)''', file=self.outFile)
             self.logMsg('error', 'Missing section in appendSection (probably a <type> element missing its \'category\' attribute. Text:', text)
             exit(1)
 
-        # Add text to REPLACEMENT_EXACT_TEXT_ARR if it is in REPLACEMENT_CONTAINS_ARR
-        # See REPLACEMENT_CONTAINS_ARR for explanation
-        esc_text = self.escStr(text)
-        for starts_with in self.REPLACEMENT_CONTAINS_ARR:
-            if text.__contains__(starts_with):
-                self.REPLACEMENT_EXACT_TEXT_ARR.append(esc_text)
         self.sections[section].append(text)
         self.feature_not_empty = True
 
@@ -878,6 +846,20 @@ fn C.volkLoadDevice(Device)''', file=self.outFile)
                 structextends = typeElem.get('structextends')
                 body += '// ' + typeName + ' extends ' + structextends + '\n' if structextends else ''
 
+            if typeName not in self.ALIAS_TO_BASE_TYPE_MAP:
+                self.ALIAS_TO_BASE_TYPE_MAP[typeName] = 'C.'+ typeNameOrig
+
+            targetLen = self.getMaxCParamTypeLength(typeinfo)
+            self.fixed_array_aliases = []
+            members = ''
+            for member in typeElem.findall('.//member'):
+                members += self.deprecationComment(member, indent = 4)
+                members += self.makeVParamDecl(typeName, member, targetLen + 4, do_struct_members = True,  keep_vk_member_name = keep_vk_member_name)
+                members += '\n'
+
+            for alias_name, alias_type in self.fixed_array_aliases:
+                body += 'pub type ' + alias_name + ' = ' + alias_type + '\n'
+
             body += 'pub type ' + typeName + ' = ' + 'C.'+ typeNameOrig + '\n'
             if typeElem.get('category') == 'struct':
                 body += '@[typedef]\npub struct '
@@ -891,15 +873,8 @@ fn C.volkLoadDevice(Device)''', file=self.outFile)
                 body += self.genOpts.aliasMacro
 
             body +=  'C.'+ typeNameOrig + ' {\n'
-            if typeName not in self.ALIAS_TO_BASE_TYPE_MAP:
-                self.ALIAS_TO_BASE_TYPE_MAP[typeName] = 'C.'+ typeNameOrig
-
-            targetLen = self.getMaxCParamTypeLength(typeinfo)
             body += 'pub mut:\n'
-            for member in typeElem.findall('.//member'):
-                body += self.deprecationComment(member, indent = 4)
-                body += self.makeVParamDecl(typeName, member, targetLen + 4, do_struct_members = True,  keep_vk_member_name = keep_vk_member_name)
-                body += '\n'
+            body += members
             body += '}\n'
             if protect_end:
                 body += protect_end
@@ -1474,6 +1449,17 @@ fn C.volkLoadDevice(Device)''', file=self.outFile)
                 v_type = v_type[:last_index_of_arr] + '[' + self.removeVk(array_match.group(1).lower().replace('[', '').replace(']', '')) + ']' + v_type[last_index_of_arr:]
                 if do_array_voidptr:
                     v_type = 'voidptr'
+
+            # Vulkan Video exposes several PascalCase C fields whose types are
+            # inline fixed arrays. V3 parses `FieldName [N]T` as an embedded
+            # type followed by an attribute. A named array alias removes that
+            # ambiguity while preserving the public field and its C spelling
+            # for stable V.
+            if (do_struct_members and elem is param[-1]
+                and v_name[:1].isupper() and v_type.startswith('[')):
+                alias_name = typeName + v_name + 'Array'
+                self.fixed_array_aliases.append((alias_name, v_type))
+                v_type = alias_name
 
             v_name = self.make_v_param_name(
                 param,
@@ -2189,10 +2175,6 @@ pub fn make_video_std_version(major u32, minor u32, patch u32) u32 {
         codec_name = match.group(1).lower()
         major, minor, patch = match.group(2), match.group(3), match.group(4)
         return f'pub const std_vulkan_video_codec_{codec_name}_api_version_{major}_{minor}_{patch} = make_video_std_version({major}, {minor}, {patch})'
-
-    # If text contains `\` before new line, the mapping isn't found. This fixes it
-    def escStr(self, text) -> str:
-        return text.replace(r'\\', '\\\\').replace(r'\n', '\\n')
 
     # NOTE Anton: the oiginal method comes from vulkandocs/scripts/generator.py
     def deprecationComment(self, elem, indent = 0):
