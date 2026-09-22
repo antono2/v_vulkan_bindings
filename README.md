@@ -46,6 +46,15 @@ The script refuses to switch an existing `vulkandocs` checkout if it contains
 local changes. Generated files are written to `src/vulkan.v` and
 `src/vulkan_video.v`; review their diff before committing.
 
+Platform extensions are selected with V compile flags derived from the
+registry's `<platform>` names. For example, `-d vulkan_xlib` includes the
+Xlib declarations and supplies `VK_USE_PLATFORM_XLIB_KHR` to the C compiler.
+XCB and Wayland have separate flags (`vulkan_xcb` and `vulkan_wayland`).
+The same rule applies to Android, Win32, Metal, and the other registry
+platforms. Extension name and spec-version constants remain available without
+the flag; platform types and commands require it and the platform's native
+development headers.
+
 ## Manual generation
 
 The generator imports helper modules from a `vulkandocs` checkout at the
