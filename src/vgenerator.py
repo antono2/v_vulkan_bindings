@@ -336,6 +336,7 @@ class VOutputGenerator(OutputGenerator):
         self.feature_not_empty = False
         self.may_alias = None
         self.fixed_array_aliases = []
+        self.emitted_platform_flags = set()
 
     def beginFile(self, genOpts):
         OutputGenerator.beginFile(self, genOpts)
@@ -401,6 +402,15 @@ fn C.volkLoadDevice(Device)''', file=self.outFile)
     def beginFeature(self, interface, emit):
         # Start processing in superclass
         OutputGenerator.beginFeature(self, interface, emit)
+        platform = interface.get('platform')
+        self.feature_platform_flag = None
+        self.feature_platform_protect = None
+        if platform:
+            platform_elem = self.registry.tree.find(f"./platforms/platform[@name='{platform}']")
+            if platform_elem is None or not platform_elem.get('protect'):
+                raise RuntimeError(f'Missing Vulkan guard for platform {platform}')
+            self.feature_platform_flag = f'vulkan_{platform}'
+            self.feature_platform_protect = platform_elem.get('protect')
         # C-specific
         # Accumulate includes, defines, types, enums, function pointer typedefs,
         # end function prototypes separately for this feature. They are only
@@ -447,8 +457,35 @@ fn C.volkLoadDevice(Device)''', file=self.outFile)
                     self.newline()
 
                     self.featureName = self.removeVk(self.featureName)
+                    # Extension name/version constants are useful when checking
+                    # support, even when their platform declarations are off.
+                    if self.feature_platform_flag and self.sections['define']:
+                        write('\n'.join(self.sections['define']), file=self.outFile)
+                    public_constants = []
+                    if self.feature_platform_flag:
+                        constant_prefix = f'pub const {self.featureName}_'
+                        for entry in self.sections['enum']:
+                            stripped = entry.strip()
+                            if stripped.startswith(constant_prefix) and (
+                                stripped.startswith(constant_prefix + 'spec_version') or
+                                stripped.startswith(constant_prefix + 'extension_name')
+                            ):
+                                public_constants.append(entry)
+                        if public_constants:
+                            write('\n'.join(public_constants), file=self.outFile)
+                    if self.feature_platform_flag:
+                        if self.feature_platform_flag not in self.emitted_platform_flags:
+                            write(f'$if {self.feature_platform_flag} ? {{', file=self.outFile)
+                            write(f'#flag -D{self.feature_platform_protect}', file=self.outFile)
+                            write('}', file=self.outFile)
+                            self.emitted_platform_flags.add(self.feature_platform_flag)
+                        write(f'$if {self.feature_platform_flag} ? {{', file=self.outFile)
                     for section in self.TYPE_SECTIONS:
+                        if self.feature_platform_flag and section == 'define':
+                            continue
                         contents = self.sections[section]
+                        if self.feature_platform_flag and section == 'enum':
+                            contents = [entry for entry in contents if entry not in public_constants]
                         if contents:
                             write('\n'.join(contents), file=self.outFile)
                     if self.genOpts.genFuncPointers and self.sections['commandPointer']:
@@ -475,6 +512,8 @@ fn C.volkLoadDevice(Device)''', file=self.outFile)
                                   file=self.outFile)
                         else:
                             self.newline()
+                    if self.feature_platform_flag:
+                        write('}', file=self.outFile)
                     if self.featureExtraProtect is not None:
                         write('#endif' +
                               self._endProtectComment(protect_str=self.featureExtraProtect),

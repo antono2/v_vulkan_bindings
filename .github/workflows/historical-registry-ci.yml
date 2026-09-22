@@ -81,6 +81,11 @@ jobs:
           python src/main.py -registry vulkandocs/xml/vk.xml vulkan.v
           python src/main.py -registry vulkandocs/xml/video.xml vulkan_video.v
 
+          grep -F 'pub const khr_xlib_surface_extension_name' src/vulkan.v
+          grep -F '$if vulkan_xlib ? {' src/vulkan.v
+          grep -F '#flag -DVK_USE_PLATFORM_XLIB_KHR' src/vulkan.v
+          grep -F '$if vulkan_win32 ? {' src/vulkan.v
+
           grep -F 'pub type StdVideoH264ScalingListsScalingList4x4Array' \
             src/vulkan_video.v
           if grep -E '^[[:space:]]+[A-Z][A-Za-z0-9_]*[[:space:]]+\[' \
@@ -95,6 +100,8 @@ jobs:
           ln -s "$GITHUB_WORKSPACE/published" \
             "$RUNNER_TEMP/vmodules/antono2/vulkan"
           VMODULES="$RUNNER_TEMP/vmodules" v -new-compiler -check test/main.c.v
+          VMODULES="$RUNNER_TEMP/vmodules" v -new-compiler -d vulkan_xlib \
+            -check test/main.c.v
 
   generate-and-compile:
     name: Vulkan-Docs ${{ matrix.version }}
@@ -146,6 +153,9 @@ jobs:
             --output "$VULKAN_SDK/include/volk/volk.c"
           ln -s "$GITHUB_WORKSPACE/published" "$HOME/.vmodules/antono2/vulkan"
           v -cc gcc run test
+          if [[ "$VERSION" == v1.4.335 ]]; then
+            v -d vulkan_xlib -cc gcc run test
+          fi
 
   required-checks:
     if: always()
