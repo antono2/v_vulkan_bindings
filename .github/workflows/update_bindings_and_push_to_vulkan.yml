@@ -69,6 +69,11 @@ jobs:
           repository: KhronosGroup/Vulkan-Docs
           path: vulkandocs
           ref: ${{ needs.versions.outputs.requested }}
+      - uses: actions/checkout@v7
+        with:
+          repository: KhronosGroup/Vulkan-Headers
+          path: vulkanheaders
+          ref: ${{ needs.versions.outputs.requested }}
       - uses: prantlf/setup-v-action@v4
       - uses: actions/setup-python@v7
         with:
@@ -85,6 +90,8 @@ jobs:
           v fmt -w src/vulkan.v
           v fmt -w src/vulkan_video.v
           printf '%s\n' '${{ needs.versions.outputs.requested }}' > VERSION
+          git -C vulkanheaders rev-parse HEAD > REGISTRY_COMMIT
+          grep -Eq '^[0-9a-f]{40}$' REGISTRY_COMMIT
       - uses: NcStudios/VulkanCI@v1.2
         with:
           sdkVersion: 1.4.309.0
@@ -106,6 +113,7 @@ jobs:
             src/vulkan.v
             src/vulkan_video.v
             VERSION
+            REGISTRY_COMMIT
 
   propose:
     needs: [versions, generate]
@@ -129,8 +137,9 @@ jobs:
           install -m 0644 generated/src/vulkan.v vulkan.v
           install -m 0644 generated/src/vulkan_video.v vulkan_video.v
           install -m 0644 generated/VERSION VERSION
+          install -m 0644 generated/REGISTRY_COMMIT REGISTRY_COMMIT
           git diff --check
-          git add vulkan.v vulkan_video.v VERSION
+          git add vulkan.v vulkan_video.v VERSION REGISTRY_COMMIT
           git diff --cached --quiet && {
             echo "Generated files already match master"
             exit 0

@@ -395,6 +395,8 @@ SOFTWARE.
             if self.genOpts.filename.endswith('/vulkan.v'):
                 write('''import vulkan.c as _
 
+#include "c/loader_bridge.h"
+
 // Volk owns the Vulkan loader dispatch table used by this binding. Keep the
 // declarations next to the public Vulkan types, while the implementation is
 // compiled exactly once in c/volk.c.v.
