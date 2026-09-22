@@ -78,6 +78,11 @@ validates them with V, and opens a generated pull request in
 creates the matching immutable version tag after the target repository's
 required checks pass.
 
+When the registry tag is already published but the generator itself needs a
+compatibility correction, run the workflow manually with `force_regenerate`.
+It opens a `compat/generated-<tag>` pull request without changing `VERSION` or
+using the release-only `generated/*` branch namespace.
+
 `publish-compatibility-tags.yml` is a manual maintenance workflow for old
 registry releases whose original generated layout is not accepted by current
 V. It publishes new `+vcompat.N` tags and never rewrites the historical tags.
