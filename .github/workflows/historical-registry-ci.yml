@@ -32,6 +32,70 @@ jobs:
             throw 'Vulkan Video bindings were not generated'
           }
 
+  strict-v3-frontend:
+    name: Strict V3 frontend
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7
+        with:
+          repository: KhronosGroup/Vulkan-Docs
+          ref: v1.4.362
+          path: vulkandocs
+      - uses: actions/checkout@v7
+        with:
+          repository: antono2/vulkan
+          path: published
+      - uses: actions/checkout@v7
+        with:
+          repository: vlang/v
+          ref: 239f06c1de4b6380b2c9d03eed023996951b2c74
+          path: .ci-v-source
+          fetch-depth: 1
+      - uses: actions/checkout@v7
+        with:
+          repository: vlang/vc
+          ref: 21490f7811a2dd366c3daa39bef8e53c1e3e5727
+          path: .ci-v-source/vc
+          fetch-depth: 1
+      - uses: actions/checkout@v7
+        with:
+          repository: vlang/tccbin
+          ref: d6e7ac1b1bcc98aed734a6ecbfa8509f24606c74
+          path: .ci-v-source/thirdparty/tcc
+          fetch-depth: 1
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.x"
+          cache: pip
+          cache-dependency-path: .github/generator-requirements.txt
+      - name: Build pinned V3 compiler
+        run: |
+          make -C .ci-v-source local=1
+          echo "$GITHUB_WORKSPACE/.ci-v-source" >> "$GITHUB_PATH"
+          .ci-v-source/v -V
+      - name: Generate and type-check current bindings
+        run: |
+          set -euo pipefail
+          python -m pip install --requirement .github/generator-requirements.txt
+          python src/main.py -registry vulkandocs/xml/vk.xml vulkan.v
+          python src/main.py -registry vulkandocs/xml/video.xml vulkan_video.v
+
+          grep -F 'pub type StdVideoH264ScalingListsScalingList4x4Array' \
+            src/vulkan_video.v
+          if grep -E '^[[:space:]]+[A-Z][A-Za-z0-9_]*[[:space:]]+\[' \
+            src/vulkan_video.v; then
+            echo 'PascalCase fixed-array fields must use named array aliases' >&2
+            exit 1
+          fi
+
+          install -m 0644 src/vulkan.v published/vulkan.v
+          install -m 0644 src/vulkan_video.v published/vulkan_video.v
+          install -d "$RUNNER_TEMP/vmodules/antono2"
+          ln -s "$GITHUB_WORKSPACE/published" \
+            "$RUNNER_TEMP/vmodules/antono2/vulkan"
+          VMODULES="$RUNNER_TEMP/vmodules" v -new-compiler -check test/main.c.v
+
   generate-and-compile:
     name: Vulkan-Docs ${{ matrix.version }}
     strategy:
@@ -82,13 +146,15 @@ jobs:
 
   required-checks:
     if: always()
-    needs: [windows-generator, generate-and-compile]
+    needs: [windows-generator, strict-v3-frontend, generate-and-compile]
     runs-on: ubuntu-24.04
     steps:
       - name: Verify historical registry matrix
         env:
           WINDOWS_RESULT: ${{ needs.windows-generator.result }}
+          V3_RESULT: ${{ needs.strict-v3-frontend.result }}
           MATRIX_RESULT: ${{ needs.generate-and-compile.result }}
         run: |
           test "$WINDOWS_RESULT" = success
+          test "$V3_RESULT" = success
           test "$MATRIX_RESULT" = success

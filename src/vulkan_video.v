@@ -170,7 +170,6 @@ pub enum StdVideoH264NonVclNaluType as u32 {
 	precoded        = 6
 	invalid         = u32(0x7FFFFFFF)
 }
-
 pub type StdVideoH264SpsVuiFlags = C.StdVideoH264SpsVuiFlags
 
 @[typedef]
@@ -254,6 +253,8 @@ pub mut:
 	vui_parameters_present_flag          u32
 }
 
+pub type StdVideoH264ScalingListsScalingList4x4Array = [std_video_h264_scaling_list_4x4_num_lists][std_video_h264_scaling_list_4x4_num_elements]u8
+pub type StdVideoH264ScalingListsScalingList8x8Array = [std_video_h264_scaling_list_8x8_num_lists][std_video_h264_scaling_list_8x8_num_elements]u8
 pub type StdVideoH264ScalingLists = C.StdVideoH264ScalingLists
 
 @[typedef]
@@ -261,8 +262,8 @@ pub struct C.StdVideoH264ScalingLists {
 pub mut:
 	scaling_list_present_mask       u16
 	use_default_scaling_matrix_mask u16
-	ScalingList4x4                  [std_video_h264_scaling_list_4x4_num_lists][std_video_h264_scaling_list_4x4_num_elements]u8
-	ScalingList8x8                  [std_video_h264_scaling_list_8x8_num_lists][std_video_h264_scaling_list_8x8_num_elements]u8
+	ScalingList4x4                  StdVideoH264ScalingListsScalingList4x4Array
+	ScalingList8x8                  StdVideoH264ScalingListsScalingList8x8Array
 }
 
 pub type StdVideoH264SequenceParameterSet = C.StdVideoH264SequenceParameterSet
@@ -340,7 +341,6 @@ pub enum StdVideoDecodeH264FieldOrderCount as u32 {
 	bottom  = 1
 	invalid = u32(0x7FFFFFFF)
 }
-
 pub type StdVideoDecodeH264PictureInfoFlags = C.StdVideoDecodeH264PictureInfoFlags
 
 @[typedef]
@@ -354,6 +354,7 @@ pub mut:
 	complementary_field_pair u32
 }
 
+pub type StdVideoDecodeH264PictureInfoPicOrderCntArray = [std_video_decode_h264_field_order_count_list_size]i32
 pub type StdVideoDecodeH264PictureInfo = C.StdVideoDecodeH264PictureInfo
 
 @[typedef]
@@ -366,7 +367,7 @@ pub mut:
 	reserved2            u8
 	frame_num            u16
 	idr_pic_id           u16
-	PicOrderCnt          [std_video_decode_h264_field_order_count_list_size]i32
+	PicOrderCnt          StdVideoDecodeH264PictureInfoPicOrderCntArray
 }
 
 pub type StdVideoDecodeH264ReferenceInfoFlags = C.StdVideoDecodeH264ReferenceInfoFlags
@@ -380,6 +381,7 @@ pub mut:
 	is_non_existing              u32
 }
 
+pub type StdVideoDecodeH264ReferenceInfoPicOrderCntArray = [std_video_decode_h264_field_order_count_list_size]i32
 pub type StdVideoDecodeH264ReferenceInfo = C.StdVideoDecodeH264ReferenceInfo
 
 @[typedef]
@@ -388,7 +390,7 @@ pub mut:
 	flags       StdVideoDecodeH264ReferenceInfoFlags
 	FrameNum    u16
 	reserved    u16
-	PicOrderCnt [std_video_decode_h264_field_order_count_list_size]i32
+	PicOrderCnt StdVideoDecodeH264ReferenceInfoPicOrderCntArray
 }
 
 pub const std_vulkan_video_codec_h264_encode_api_version_1_0_0 = make_video_std_version(1, 0, 0)
@@ -488,6 +490,8 @@ pub mut:
 	max_long_term_frame_idx_plus1       u16
 }
 
+pub type StdVideoEncodeH264ReferenceListsInfoRefPicList0Array = [std_video_h264_max_num_list_ref]u8
+pub type StdVideoEncodeH264ReferenceListsInfoRefPicList1Array = [std_video_h264_max_num_list_ref]u8
 pub type StdVideoEncodeH264ReferenceListsInfo = C.StdVideoEncodeH264ReferenceListsInfo
 
 @[typedef]
@@ -496,8 +500,8 @@ pub mut:
 	flags                        StdVideoEncodeH264ReferenceListsInfoFlags
 	num_ref_idx_l0_active_minus1 u8
 	num_ref_idx_l1_active_minus1 u8
-	RefPicList0                  [std_video_h264_max_num_list_ref]u8
-	RefPicList1                  [std_video_h264_max_num_list_ref]u8
+	RefPicList0                  StdVideoEncodeH264ReferenceListsInfoRefPicList0Array
+	RefPicList1                  StdVideoEncodeH264ReferenceListsInfoRefPicList1Array
 	refList0ModOpCount           u8
 	refList1ModOpCount           u8
 	refPicMarkingOpCount         u8
@@ -649,7 +653,6 @@ pub enum StdVideoH265AspectRatioIdc as u32 {
 	extended_sar = 255
 	invalid      = u32(0x7FFFFFFF)
 }
-
 pub type StdVideoH265DecPicBufMgr = C.StdVideoH265DecPicBufMgr
 
 @[typedef]
@@ -760,17 +763,23 @@ pub mut:
 	pProfileTierLevel                 &StdVideoH265ProfileTierLevel
 }
 
+pub type StdVideoH265ScalingListsScalingList4x4Array = [std_video_h265_scaling_list_4x4_num_lists][std_video_h265_scaling_list_4x4_num_elements]u8
+pub type StdVideoH265ScalingListsScalingList8x8Array = [std_video_h265_scaling_list_8x8_num_lists][std_video_h265_scaling_list_8x8_num_elements]u8
+pub type StdVideoH265ScalingListsScalingList16x16Array = [std_video_h265_scaling_list_16x16_num_lists][std_video_h265_scaling_list_16x16_num_elements]u8
+pub type StdVideoH265ScalingListsScalingList32x32Array = [std_video_h265_scaling_list_32x32_num_lists][std_video_h265_scaling_list_32x32_num_elements]u8
+pub type StdVideoH265ScalingListsScalingListDCCoef16x16Array = [std_video_h265_scaling_list_16x16_num_lists]u8
+pub type StdVideoH265ScalingListsScalingListDCCoef32x32Array = [std_video_h265_scaling_list_32x32_num_lists]u8
 pub type StdVideoH265ScalingLists = C.StdVideoH265ScalingLists
 
 @[typedef]
 pub struct C.StdVideoH265ScalingLists {
 pub mut:
-	ScalingList4x4         [std_video_h265_scaling_list_4x4_num_lists][std_video_h265_scaling_list_4x4_num_elements]u8
-	ScalingList8x8         [std_video_h265_scaling_list_8x8_num_lists][std_video_h265_scaling_list_8x8_num_elements]u8
-	ScalingList16x16       [std_video_h265_scaling_list_16x16_num_lists][std_video_h265_scaling_list_16x16_num_elements]u8
-	ScalingList32x32       [std_video_h265_scaling_list_32x32_num_lists][std_video_h265_scaling_list_32x32_num_elements]u8
-	ScalingListDCCoef16x16 [std_video_h265_scaling_list_16x16_num_lists]u8
-	ScalingListDCCoef32x32 [std_video_h265_scaling_list_32x32_num_lists]u8
+	ScalingList4x4         StdVideoH265ScalingListsScalingList4x4Array
+	ScalingList8x8         StdVideoH265ScalingListsScalingList8x8Array
+	ScalingList16x16       StdVideoH265ScalingListsScalingList16x16Array
+	ScalingList32x32       StdVideoH265ScalingListsScalingList32x32Array
+	ScalingListDCCoef16x16 StdVideoH265ScalingListsScalingListDCCoef16x16Array
+	ScalingListDCCoef32x32 StdVideoH265ScalingListsScalingListDCCoef32x32Array
 }
 
 pub type StdVideoH265SpsVuiFlags = C.StdVideoH265SpsVuiFlags
@@ -831,12 +840,13 @@ pub mut:
 	pHrdParameters                      &StdVideoH265HrdParameters
 }
 
+pub type StdVideoH265PredictorPaletteEntriesPredictorPaletteEntriesArray = [std_video_h265_predictor_palette_components_list_size][std_video_h265_predictor_palette_comp_entries_list_size]u16
 pub type StdVideoH265PredictorPaletteEntries = C.StdVideoH265PredictorPaletteEntries
 
 @[typedef]
 pub struct C.StdVideoH265PredictorPaletteEntries {
 pub mut:
-	PredictorPaletteEntries [std_video_h265_predictor_palette_components_list_size][std_video_h265_predictor_palette_comp_entries_list_size]u16
+	PredictorPaletteEntries StdVideoH265PredictorPaletteEntriesPredictorPaletteEntriesArray
 }
 
 pub type StdVideoH265SpsFlags = C.StdVideoH265SpsFlags
@@ -1058,6 +1068,9 @@ pub mut:
 	short_term_ref_pic_set_sps_flag u32
 }
 
+pub type StdVideoDecodeH265PictureInfoRefPicSetStCurrBeforeArray = [std_video_decode_h265_ref_pic_set_list_size]u8
+pub type StdVideoDecodeH265PictureInfoRefPicSetStCurrAfterArray = [std_video_decode_h265_ref_pic_set_list_size]u8
+pub type StdVideoDecodeH265PictureInfoRefPicSetLtCurrArray = [std_video_decode_h265_ref_pic_set_list_size]u8
 pub type StdVideoDecodeH265PictureInfo = C.StdVideoDecodeH265PictureInfo
 
 @[typedef]
@@ -1071,9 +1084,9 @@ pub mut:
 	PicOrderCntVal               i32
 	NumBitsForSTRefPicSetInSlice u16
 	reserved                     u16
-	RefPicSetStCurrBefore        [std_video_decode_h265_ref_pic_set_list_size]u8
-	RefPicSetStCurrAfter         [std_video_decode_h265_ref_pic_set_list_size]u8
-	RefPicSetLtCurr              [std_video_decode_h265_ref_pic_set_list_size]u8
+	RefPicSetStCurrBefore        StdVideoDecodeH265PictureInfoRefPicSetStCurrBeforeArray
+	RefPicSetStCurrAfter         StdVideoDecodeH265PictureInfoRefPicSetStCurrAfterArray
+	RefPicSetLtCurr              StdVideoDecodeH265PictureInfoRefPicSetLtCurrArray
 }
 
 pub type StdVideoDecodeH265ReferenceInfoFlags = C.StdVideoDecodeH265ReferenceInfoFlags
@@ -1179,6 +1192,8 @@ pub mut:
 	reserved                          u32
 }
 
+pub type StdVideoEncodeH265ReferenceListsInfoRefPicList0Array = [std_video_h265_max_num_list_ref]u8
+pub type StdVideoEncodeH265ReferenceListsInfoRefPicList1Array = [std_video_h265_max_num_list_ref]u8
 pub type StdVideoEncodeH265ReferenceListsInfo = C.StdVideoEncodeH265ReferenceListsInfo
 
 @[typedef]
@@ -1187,8 +1202,8 @@ pub mut:
 	flags                        StdVideoEncodeH265ReferenceListsInfoFlags
 	num_ref_idx_l0_active_minus1 u8
 	num_ref_idx_l1_active_minus1 u8
-	RefPicList0                  [std_video_h265_max_num_list_ref]u8
-	RefPicList1                  [std_video_h265_max_num_list_ref]u8
+	RefPicList0                  StdVideoEncodeH265ReferenceListsInfoRefPicList0Array
+	RefPicList1                  StdVideoEncodeH265ReferenceListsInfoRefPicList1Array
 	list_entry_l0                [std_video_h265_max_num_list_ref]u8
 	list_entry_l1                [std_video_h265_max_num_list_ref]u8
 }
@@ -1430,7 +1445,6 @@ pub enum StdVideoAV1ChromaSamplePosition as u32 {
 	reserved  = 3
 	invalid   = u32(0x7FFFFFFF)
 }
-
 pub type StdVideoAV1ColorConfigFlags = C.StdVideoAV1ColorConfigFlags
 
 @[typedef]
@@ -1530,13 +1544,15 @@ pub mut:
 	qm_v       u8
 }
 
+pub type StdVideoAV1SegmentationFeatureEnabledArray = [std_video_av1_max_segments]u8
+pub type StdVideoAV1SegmentationFeatureDataArray = [std_video_av1_max_segments][std_video_av1_seg_lvl_max]i16
 pub type StdVideoAV1Segmentation = C.StdVideoAV1Segmentation
 
 @[typedef]
 pub struct C.StdVideoAV1Segmentation {
 pub mut:
-	FeatureEnabled [std_video_av1_max_segments]u8
-	FeatureData    [std_video_av1_max_segments][std_video_av1_seg_lvl_max]i16
+	FeatureEnabled StdVideoAV1SegmentationFeatureEnabledArray
+	FeatureData    StdVideoAV1SegmentationFeatureDataArray
 }
 
 pub type StdVideoAV1TileInfoFlags = C.StdVideoAV1TileInfoFlags
@@ -1578,21 +1594,24 @@ pub mut:
 	cdef_uv_sec_strength [std_video_av1_max_cdef_filter_strengths]u8
 }
 
+pub type StdVideoAV1LoopRestorationFrameRestorationTypeArray = [std_video_av1_max_num_planes]StdVideoAV1FrameRestorationType
+pub type StdVideoAV1LoopRestorationLoopRestorationSizeArray = [std_video_av1_max_num_planes]u16
 pub type StdVideoAV1LoopRestoration = C.StdVideoAV1LoopRestoration
 
 @[typedef]
 pub struct C.StdVideoAV1LoopRestoration {
 pub mut:
-	FrameRestorationType [std_video_av1_max_num_planes]StdVideoAV1FrameRestorationType
-	LoopRestorationSize  [std_video_av1_max_num_planes]u16
+	FrameRestorationType StdVideoAV1LoopRestorationFrameRestorationTypeArray
+	LoopRestorationSize  StdVideoAV1LoopRestorationLoopRestorationSizeArray
 }
 
+pub type StdVideoAV1GlobalMotionGmTypeArray = [std_video_av1_num_ref_frames]u8
 pub type StdVideoAV1GlobalMotion = C.StdVideoAV1GlobalMotion
 
 @[typedef]
 pub struct C.StdVideoAV1GlobalMotion {
 pub mut:
-	GmType    [std_video_av1_num_ref_frames]u8
+	GmType    StdVideoAV1GlobalMotionGmTypeArray
 	gm_params [std_video_av1_num_ref_frames][std_video_av1_global_motion_params]i32
 }
 
@@ -1729,6 +1748,8 @@ pub mut:
 	reserved                         u32
 }
 
+pub type StdVideoDecodeAV1PictureInfoSkipModeFrameArray = [std_video_av1_skip_mode_frames]u8
+pub type StdVideoDecodeAV1PictureInfoOrderHintsArray = [std_video_av1_num_ref_frames]u8
 pub type StdVideoDecodeAV1PictureInfo = C.StdVideoDecodeAV1PictureInfo
 
 @[typedef]
@@ -1745,10 +1766,10 @@ pub mut:
 	TxMode               StdVideoAV1TxMode
 	delta_q_res          u8
 	delta_lf_res         u8
-	SkipModeFrame        [std_video_av1_skip_mode_frames]u8
+	SkipModeFrame        StdVideoDecodeAV1PictureInfoSkipModeFrameArray
 	coded_denom          u8
 	reserved2            [3]u8
-	OrderHints           [std_video_av1_num_ref_frames]u8
+	OrderHints           StdVideoDecodeAV1PictureInfoOrderHintsArray
 	expectedFrameId      [std_video_av1_num_ref_frames]u32
 	pTileInfo            &StdVideoAV1TileInfo
 	pQuantization        &StdVideoAV1Quantization
@@ -1770,6 +1791,7 @@ pub mut:
 	reserved                     u32
 }
 
+pub type StdVideoDecodeAV1ReferenceInfoSavedOrderHintsArray = [std_video_av1_num_ref_frames]u8
 pub type StdVideoDecodeAV1ReferenceInfo = C.StdVideoDecodeAV1ReferenceInfo
 
 @[typedef]
@@ -1779,7 +1801,7 @@ pub mut:
 	frame_type       u8
 	RefFrameSignBias u8
 	OrderHint        u8
-	SavedOrderHints  [std_video_av1_num_ref_frames]u8
+	SavedOrderHints  StdVideoDecodeAV1ReferenceInfoSavedOrderHintsArray
 }
 
 pub const std_vulkan_video_codec_av1_encode_api_version_1_0_0 = make_video_std_version(1, 0, 0)
@@ -1995,7 +2017,6 @@ pub enum StdVideoVP9ColorSpace as u32 {
 	rgb      = 7
 	invalid  = u32(0x7FFFFFFF)
 }
-
 pub type StdVideoVP9ColorConfigFlags = C.StdVideoVP9ColorConfigFlags
 
 @[typedef]
@@ -2054,6 +2075,8 @@ pub mut:
 	reserved                         u32
 }
 
+pub type StdVideoVP9SegmentationFeatureEnabledArray = [std_video_vp9_max_segments]u8
+pub type StdVideoVP9SegmentationFeatureDataArray = [std_video_vp9_max_segments][std_video_vp9_seg_lvl_max]i16
 pub type StdVideoVP9Segmentation = C.StdVideoVP9Segmentation
 
 @[typedef]
@@ -2062,8 +2085,8 @@ pub mut:
 	flags                   StdVideoVP9SegmentationFlags
 	segmentation_tree_probs [std_video_vp9_max_segmentation_tree_probs]u8
 	segmentation_pred_prob  [std_video_vp9_max_segmentation_pred_prob]u8
-	FeatureEnabled          [std_video_vp9_max_segments]u8
-	FeatureData             [std_video_vp9_max_segments][std_video_vp9_seg_lvl_max]i16
+	FeatureEnabled          StdVideoVP9SegmentationFeatureEnabledArray
+	FeatureData             StdVideoVP9SegmentationFeatureDataArray
 }
 
 pub const std_vulkan_video_codec_vp9_decode_api_version_1_0_0 = make_video_std_version(1, 0, 0)
