@@ -73,7 +73,7 @@ jobs:
         run: |
           make -C .ci-v-source local=1
           echo "$GITHUB_WORKSPACE/.ci-v-source" >> "$GITHUB_PATH"
-          .ci-v-source/v -V
+          .ci-v-source/v version
       - name: Generate and type-check current bindings
         run: |
           set -euo pipefail
