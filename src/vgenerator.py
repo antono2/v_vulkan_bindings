@@ -211,6 +211,7 @@ class VOutputGenerator(OutputGenerator):
         'u16',
         'u16',
         'int',
+        'i32',
         'u32',
         'i64',
         'u64',
@@ -263,6 +264,8 @@ class VOutputGenerator(OutputGenerator):
 
     TYPE_MAP = {
         'size_t': 'usize',
+        # C int has a fixed 32-bit ABI here; V3's int is 64-bit on 64-bit hosts.
+        'int': 'i32',
         'void*': 'voidptr',
         '&void': 'voidptr',
         'void**': '&voidptr',
