@@ -1398,7 +1398,7 @@ fn C.volkLoadDevice(Device)''', file=self.outFile)
     # NOTE Anton: the oiginal method comes from vulkandocs/scripts/generator.py
     # This handles one function parameter and usually returns the paramdecl string.
     # Parameter comment is returned as a tuple (paramdecl, comment) if do_comment=True and comment_inline=False
-    def makeVParamDecl(self, typeName, param, aligncol, do_c_func_params=False, do_c_to_v_func_call_params=False, do_struct_members=False, do_base_type=False, keep_vk_member_name=False, do_array_voidptr=False, do_comment=False, comment_inline=False):
+    def makeVParamDecl(self, typeName, param, aligncol, do_c_func_params=False, do_c_to_v_func_call_params=False, do_struct_members=False, do_base_type=False, keep_vk_member_name=False, do_array_voidptr=False, do_comment=False, comment_inline=False, do_function_pointer_param=False):
         """Return a string which is an indented, formatted
         declaration for a `<param>` or `<member>` block (e.g. function parameter
         or structure/union member).
@@ -1498,6 +1498,10 @@ fn C.volkLoadDevice(Device)''', file=self.outFile)
                 v_type = v_type[:last_index_of_arr] + '[' + self.removeVk(array_match.group(1).lower().replace('[', '').replace(']', '')) + ']' + v_type[last_index_of_arr:]
                 if do_array_voidptr:
                     v_type = 'voidptr'
+                elif do_function_pointer_param:
+                    # C array parameters decay to pointers. V3 cannot lower a
+                    # fixed array parameter inside a function-pointer typedef.
+                    v_type = '&' + v_type[v_type.find(']') + 1:]
 
             # Vulkan Video exposes several PascalCase C fields whose types are
             # inline fixed arrays. V3 parses `FieldName [N]T` as an embedded
@@ -1995,7 +1999,7 @@ fn C.volkLoadDevice(Device)''', file=self.outFile)
         if n > 0:
             v_pub_type_pfn_param_names = '('
             for p in params:
-                cur_type = self.makeVParamDecl(v_name, p, self.genOpts.alignFuncParam, do_c_func_params=True, do_c_to_v_func_call_params=False, do_struct_members=False, do_base_type=False, do_array_voidptr=False, keep_vk_member_name=False).lstrip()
+                cur_type = self.makeVParamDecl(v_name, p, self.genOpts.alignFuncParam, do_c_func_params=True, do_c_to_v_func_call_params=False, do_struct_members=False, do_base_type=False, do_array_voidptr=False, keep_vk_member_name=False, do_function_pointer_param=True).lstrip()
                 v_pub_type_pfn_param_names += '{}, '.format(cur_type)
             v_pub_type_pfn_param_names = v_pub_type_pfn_param_names.rstrip(', ')
             v_pub_type_pfn_param_names += ')'
