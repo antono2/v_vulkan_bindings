@@ -44,8 +44,10 @@ jobs:
           current=$(curl --fail --silent --show-error --location "$TARGET_VERSION_URL")
           requested=$REQUESTED_VERSION
           if [[ -z "$requested" ]]; then
-            requested=$(curl --fail --silent --show-error --location \
-              https://api.github.com/repos/KhronosGroup/Vulkan-Docs/tags | jq -er '.[0].name')
+            requested=$(git ls-remote --tags --refs https://github.com/KhronosGroup/Vulkan-Docs.git \
+              | awk -F/ '{print $NF}' \
+              | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' \
+              | sort -V | tail -n 1)
           fi
           [[ "$current" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
             echo "Invalid published version: $current" >&2
@@ -55,6 +57,10 @@ jobs:
             echo "Invalid requested version: $requested" >&2
             exit 1
           }
+          if [[ "$(printf '%s\n%s\n' "$current" "$requested" | sort -V | head -n 1)" != "$current" ]]; then
+            echo "Refusing to replace published registry $current with older $requested" >&2
+            exit 1
+          fi
           changed=true
           branch="generated/$requested"
           if [[ "$current" == "$requested" ]]; then
@@ -90,6 +96,8 @@ jobs:
           path: vulkanheaders
           ref: ${{ needs.versions.outputs.requested }}
       - uses: prantlf/setup-v-action@92f20bea50d2c9931a28c96bb4997a3c7357baf0 # v4
+        with:
+          version: 0.5.2
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
           python-version: "3.x"
@@ -107,18 +115,23 @@ jobs:
           printf '%s\n' '${{ needs.versions.outputs.requested }}' > VERSION
           git -C vulkanheaders rev-parse HEAD > REGISTRY_COMMIT
           grep -Eq '^[0-9a-f]{40}$' REGISTRY_COMMIT
+          for directory in vulkan vk_video; do
+            target="published/c/vendor/include/$directory"
+            source="vulkanheaders/include/$directory"
+            install -d "$target"
+            find "$target" -maxdepth 1 -name '*.h' -delete
+            find "$source" -maxdepth 1 -name '*.h' -exec cp -t "$target" {} +
+          done
       - uses: NcStudios/VulkanCI@1a5db3ebde578c503b1d7f8df007e42a7367224c # v1.2
         env:
           # VulkanCI uses github.action_ref as its release artifact tag.
           VK_CI_TEST_TAG_OVERRIDE: v1.2
         with:
           sdkVersion: 1.4.309.0
-      - name: Download Volk and compile smoke test
+      - name: Compile against the matching bundled headers and Volk
         run: |
           set -euo pipefail
-          install -d "$VULKAN_SDK/include/volk" "$HOME/.vmodules/antono2"
-          curl --fail --silent --show-error --location https://raw.githubusercontent.com/zeux/volk/master/volk.h --output "$VULKAN_SDK/include/volk/volk.h"
-          curl --fail --silent --show-error --location https://raw.githubusercontent.com/zeux/volk/master/volk.c --output "$VULKAN_SDK/include/volk/volk.c"
+          install -d "$HOME/.vmodules/antono2"
           install -m 0644 src/vulkan.v published/vulkan.v
           install -m 0644 src/vulkan_video.v published/vulkan_video.v
           ln -s "$GITHUB_WORKSPACE/published" "$HOME/.vmodules/antono2/vulkan"
@@ -132,6 +145,8 @@ jobs:
             src/vulkan_video.v
             VERSION
             REGISTRY_COMMIT
+            published/c/vendor/include/vulkan/*.h
+            published/c/vendor/include/vk_video/*.h
 
   propose:
     needs: [versions, generate]
@@ -156,8 +171,15 @@ jobs:
           install -m 0644 generated/src/vulkan_video.v vulkan_video.v
           install -m 0644 generated/VERSION VERSION
           install -m 0644 generated/REGISTRY_COMMIT REGISTRY_COMMIT
+          for directory in vulkan vk_video; do
+            target="c/vendor/include/$directory"
+            source="generated/published/c/vendor/include/$directory"
+            find "$target" -maxdepth 1 -name '*.h' -delete
+            cp "$source"/*.h "$target/"
+          done
           git diff --check
-          git add vulkan.v vulkan_video.v VERSION REGISTRY_COMMIT
+          git add vulkan.v vulkan_video.v VERSION REGISTRY_COMMIT \
+            c/vendor/include/vulkan c/vendor/include/vk_video
           git diff --cached --quiet && {
             echo "Generated files already match master"
             exit 0

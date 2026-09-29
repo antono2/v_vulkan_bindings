@@ -81,11 +81,17 @@ Params VulkanVideo: -registry ../../../../usr/share/vulkan/registry/video.xml vu
 
 ## Publishing
 
-`update_bindings_and_push_to_vulkan.yml` regenerates the current bindings,
-validates them with V, and opens a generated pull request in
+`update_bindings_and_push_to_vulkan.yml` checks the newest numeric Vulkan-Docs
+tag each day, regenerates the bindings against that tag, and opens a generated
+pull request in
 [`antono2/vulkan`](https://github.com/antono2/vulkan). Merging that pull request
 creates the matching immutable version tag after the target repository's
 required checks pass.
+The proposal also copies the matching Vulkan and video C headers from the
+same Vulkan-Headers tag. The compile smoke test uses those bundled headers
+and the target module's pinned Volk sources. Registry downgrades are rejected.
+The generator checkout's own `VERSION` remains a reproducible local generation
+default; the scheduled workflow selects the newest tag independently.
 
 When the registry tag is already published but the generator itself needs a
 compatibility correction, run the workflow manually with `force_regenerate`.
