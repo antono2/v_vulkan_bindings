@@ -861,7 +861,7 @@ fn C.volkLoadDevice(Device)''', file=self.outFile)
                                       if x is not None))
         return typeName in self.may_alias
 
-    def genStruct(self, typeinfo, typeName, alias,  keep_vk_member_name = False):
+    def genStruct(self, typeinfo, typeName, alias, protect=None, *, keep_vk_member_name=False):
         """Generate struct (e.g. C "struct" type).
 
         This is a special case of the <type> tag where the contents are
@@ -887,7 +887,7 @@ fn C.volkLoadDevice(Device)''', file=self.outFile)
             typeName,  alias = self.v_translate_c_name_to_basetype(typeName, alias)
             body = 'pub type ' + typeName + ' = ' + alias + '\n'
         else:
-            (protect_begin, protect_end) = self.genProtectString(typeElem.get('protect'))
+            (protect_begin, protect_end) = self.genProtectString(typeElem.get('protect') or protect)
             if protect_begin:
                 body += protect_begin
 
@@ -930,7 +930,7 @@ fn C.volkLoadDevice(Device)''', file=self.outFile)
 
         self.appendSection('struct', body)
 
-    def genGroup(self, groupinfo, groupName, alias=None):
+    def genGroup(self, groupinfo, groupName, alias=None, protect=None):
         """Generate groups (e.g. C "enum" type).
 
         These are concatenated together with other types.
@@ -962,7 +962,7 @@ fn C.volkLoadDevice(Device)''', file=self.outFile)
             (section, body) = self.buildEnumVDecl(self.genOpts.genEnumBeginEndRange, groupinfo, groupName, keep_vk_member_name=False)
             self.appendSection(section, '\n' + body)
 
-    def genEnum(self, enuminfo, name, alias):
+    def genEnum(self, enuminfo, name, alias, protect=None):
         """Generate the C declaration for a constant (a single <enum> value).
 
         <enum> tags may specify their values in several ways, but are usually
@@ -1159,7 +1159,7 @@ fn C.volkLoadDevice(Device)''', file=self.outFile)
             body += f' {return_type}'
         return ('struct', body + '\n')
 
-    def genCmd(self, cmdinfo, name, alias):
+    def genCmd(self, cmdinfo, name, alias, protect=None):
         "Command generation"
         OutputGenerator.genCmd(self, cmdinfo, name, alias)
 
@@ -2076,7 +2076,7 @@ fn C.volkLoadDevice(Device)''', file=self.outFile)
         return ['@[keep_args_alive]\nfn C.' + v_name_original + c_func_def_params + ' ' + v_type + '\n' + v_wrapper, tdecl]
 
     # NOTE Anton: the oiginal method comes from vulkandocs/scripts/generator.py
-    def genType(self, typeinfo, name, alias):
+    def genType(self, typeinfo, name, alias, protect=None):
         """Generate interface for a type
 
         - typeinfo - TypeInfo for a type
@@ -2114,7 +2114,7 @@ fn C.volkLoadDevice(Device)''', file=self.outFile)
         # They must not flow through the generic genCType/genVType path,
         # otherwise they get emitted twice and V reports duplicate aliases.
         if category in ('struct', 'union'):
-            self.genStruct(typeinfo, name, alias, keep_vk_member_name=True)
+            self.genStruct(typeinfo, name, alias, protect, keep_vk_member_name=True)
             return
 
         body = ''
