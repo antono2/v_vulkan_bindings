@@ -9,6 +9,38 @@ permissions:
   contents: read
 
 jobs:
+  registry-generator-compat:
+    name: Vulkan-Docs ${{ matrix.version }} generator interface
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        version: [v1.4.363, v1.4.364]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: KhronosGroup/Vulkan-Docs
+          ref: ${{ matrix.version }}
+          path: vulkandocs
+      - uses: prantlf/setup-v-action@92f20bea50d2c9931a28c96bb4997a3c7357baf0 # v4
+        with:
+          version: 0.5.2
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.x"
+          cache: pip
+          cache-dependency-path: .github/generator-requirements.txt
+      - run: python -m pip install --requirement .github/generator-requirements.txt
+      - name: Generate and format both bindings
+        run: |
+          set -euo pipefail
+          python src/main.py -registry vulkandocs/xml/vk.xml vulkan.v
+          python src/main.py -registry vulkandocs/xml/video.xml vulkan_video.v
+          v fmt -w src/vulkan.v src/vulkan_video.v
+          v fmt -verify src/vulkan.v src/vulkan_video.v
+          git diff --check
+
   windows-generator:
     name: Windows generator setup
     runs-on: windows-2022
@@ -163,15 +195,17 @@ jobs:
 
   required-checks:
     if: always()
-    needs: [windows-generator, strict-v3-frontend, generate-and-compile]
+    needs: [registry-generator-compat, windows-generator, strict-v3-frontend, generate-and-compile]
     runs-on: ubuntu-24.04
     steps:
       - name: Verify historical registry matrix
         env:
+          REGISTRY_RESULT: ${{ needs.registry-generator-compat.result }}
           WINDOWS_RESULT: ${{ needs.windows-generator.result }}
           V3_RESULT: ${{ needs.strict-v3-frontend.result }}
           MATRIX_RESULT: ${{ needs.generate-and-compile.result }}
         run: |
+          test "$REGISTRY_RESULT" = success
           test "$WINDOWS_RESULT" = success
           test "$V3_RESULT" = success
           test "$MATRIX_RESULT" = success
