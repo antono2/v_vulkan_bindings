@@ -1,7 +1,13 @@
-# v_vulkan_bindings
+# Vulkan binding generator for V
+
 [Project portfolio](https://oreskin.de/projects_en.php)
 
-Generates the [vulkan bindings](https://github.com/antono2/vulkan) for [V](https://vlang.io/) from the current [KhronosGroup](https://github.com/KhronosGroup/) [API description](https://github.com/KhronosGroup/Vulkan-Docs/blob/main/xml/vk.xml).
+Generates Vulkan and Vulkan Video bindings for [V](https://vlang.io/) from the
+[Khronos API registries](https://github.com/KhronosGroup/Vulkan-Docs/tree/main/xml).
+
+For application development, use the published
+[`antono2.vulkan` module](https://github.com/antono2/vulkan#install-and-setup).
+This repository contains the generator and maintenance workflows.
 
 ## Quick start
 
@@ -32,7 +38,8 @@ Set-Location v_vulkan_bindings
 .\scripts\generate.ps1
 ```
 
-Pass a Vulkan-Docs tag to generate a different registry release:
+Pass a Vulkan-Docs tag to generate a different registry release. For example,
+this explicitly selects the historical `v1.4.362` snapshot:
 
 ```bash
 ./scripts/generate.sh v1.4.362
@@ -70,23 +77,32 @@ python3 -m venv .venv
 v fmt -w src/vulkan.v src/vulkan_video.v
 ```
 
-## Example Setup using preinstalled vulkan registry
-```bash
-Working Directory: ~/workspace/v_vulkan_bindings
+## Using an installed registry
 
-Script Name:        src/main.py
-Params Vulkan:      -registry ../../../../usr/share/vulkan/registry/vk.xml vulkan.v
-Params VulkanVideo: -registry ../../../../usr/share/vulkan/registry/video.xml vulkan_video.v
+The generator also needs the helper Python modules from a compatible
+`vulkandocs` checkout. After preparing those dependencies as above, you can
+point it at registry files installed by a Vulkan SDK. For example, on a Linux
+system that provides `/usr/share/vulkan/registry`:
+
+```sh
+.venv/bin/python src/main.py -registry /usr/share/vulkan/registry/vk.xml vulkan.v
+.venv/bin/python src/main.py -registry /usr/share/vulkan/registry/video.xml vulkan_video.v
 ```
+
+For reproducible output, prefer the pinned registry checkout used by the setup
+script; an installed SDK's registry version may differ.
 
 ## Publishing
 
 `update_bindings_and_push_to_vulkan.yml` checks the newest numeric Vulkan-Docs
 tag each day, regenerates the bindings against that tag, and opens a generated
 pull request in
-[`antono2/vulkan`](https://github.com/antono2/vulkan). Merging that pull request
-creates the matching immutable version tag after the target repository's
-required checks pass.
+[`antono2/vulkan`](https://github.com/antono2/vulkan). Review and merge it after
+the target repository's required checks pass. The registry snapshot then becomes
+available on the target's default branch. To publish a package release, update
+its semantic version in `v.mod` through a separate pull request and create the
+matching `v<package-version>` tag after CI passes. The target's tag workflow
+validates the version and publishes the GitHub release.
 The proposal also copies the matching Vulkan and video C headers from the
 same Vulkan-Headers tag. The compile smoke test uses those bundled headers
 and the target module's pinned Volk sources. Registry downgrades are rejected.
@@ -101,3 +117,13 @@ using the release-only `generated/*` branch namespace.
 `publish-compatibility-tags.yml` is a manual maintenance workflow for old
 registry releases whose original generated layout is not accepted by current
 V. It publishes new `+vcompat.N` tags and never rewrites the historical tags.
+
+## Documentation maintenance
+
+Include README review when changing setup, generation, platform selection,
+CI coverage, or publication behavior. Keep exact moving pins in `VERSION`,
+metadata files, and workflows, and link to those sources from prose. Historical
+tag examples should be labeled as examples rather than presented as the latest
+release. The public module's README is maintained in
+[`antono2/vulkan`](https://github.com/antono2/vulkan); include a companion update
+there when a generator change affects application users.
