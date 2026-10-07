@@ -140,6 +140,6 @@ The committed `src/vulkan.v` snapshot reports header version 347, while
 `VERSION` currently selects v1.4.335. Do not treat those as interchangeable or
 copy this snapshot over a newer published module. A full regeneration/version
 reconciliation must review the API diff and ABI checks; this documentation
-change preserves the existing snapshot. Until that reconciliation, the two
-committed generated files are recorded coverage exceptions to the new emitter
-introduction. The published module records its own input revisions.
+change preserves the existing snapshot. Until that reconciliation, `src/vulkan.v` remains a coverage exception to the new emitter
+introduction. `src/vulkan_video.v` was regenerated at v1.4.347 with unchanged
+declarations and now includes that introduction. The published module records its own input revisions.
