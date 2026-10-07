@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Prepares an isolated Python environment and regenerates bindings from the requested Vulkan-Docs tag.
 set -euo pipefail
 
 project_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." >/dev/null 2>&1 && pwd)

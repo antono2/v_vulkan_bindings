@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Loads Khronos registry XML and selects the V generator targets; run from a prepared Vulkan-Docs checkout.
 #
 # Copyright 2013-2026 The Khronos Group Inc.
 #

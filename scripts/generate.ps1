@@ -1,3 +1,4 @@
+# Prepares the Windows Python environment and regenerates bindings from the requested Vulkan-Docs tag.
 [CmdletBinding()]
 param(
     [Parameter(Position = 0)]
