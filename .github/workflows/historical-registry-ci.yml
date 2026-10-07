@@ -9,6 +9,23 @@ permissions:
   contents: read
 
 jobs:
+  default-snapshot:
+    name: Committed snapshot regeneration
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.x"
+      - uses: prantlf/setup-v-action@92f20bea50d2c9931a28c96bb4997a3c7357baf0 # v4
+        with:
+          version: 0.5.2
+      - name: Reproduce the committed API and its introductions
+        run: |
+          set -euo pipefail
+          ./scripts/generate.sh
+          git diff --exit-code -- src/vulkan.v src/vulkan_video.v
+
   registry-generator-compat:
     name: Vulkan-Docs ${{ matrix.version }} generator interface
     runs-on: ubuntu-24.04
@@ -195,16 +212,18 @@ jobs:
 
   required-checks:
     if: always()
-    needs: [registry-generator-compat, windows-generator, strict-v3-frontend, generate-and-compile]
+    needs: [default-snapshot, registry-generator-compat, windows-generator, strict-v3-frontend, generate-and-compile]
     runs-on: ubuntu-24.04
     steps:
       - name: Verify historical registry matrix
         env:
+          SNAPSHOT_RESULT: ${{ needs.default-snapshot.result }}
           REGISTRY_RESULT: ${{ needs.registry-generator-compat.result }}
           WINDOWS_RESULT: ${{ needs.windows-generator.result }}
           V3_RESULT: ${{ needs.strict-v3-frontend.result }}
           MATRIX_RESULT: ${{ needs.generate-and-compile.result }}
         run: |
+          test "$SNAPSHOT_RESULT" = success
           test "$REGISTRY_RESULT" = success
           test "$WINDOWS_RESULT" = success
           test "$V3_RESULT" = success
