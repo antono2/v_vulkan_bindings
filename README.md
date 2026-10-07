@@ -136,10 +136,20 @@ file introduction. Keep binding-purpose and regeneration guidance in that
 emitter so future generation preserves it. Upstream files in `vulkandocs/`
 retain their Khronos headers and are not maintained as local source.
 
-The committed `src/vulkan.v` snapshot reports header version 347, while
-`VERSION` currently selects v1.4.335. Do not treat those as interchangeable or
-copy this snapshot over a newer published module. A full regeneration/version
-reconciliation must review the API diff and ABI checks; this documentation
-change preserves the existing snapshot. Until that reconciliation, `src/vulkan.v` remains a coverage exception to the new emitter
-introduction. `src/vulkan_video.v` was regenerated at v1.4.347 with unchanged
-declarations and now includes that introduction. The published module records its own input revisions.
+`VERSION` selects the registry tag for the committed snapshots as well as the
+default setup command. The current snapshots use Vulkan-Docs `v1.4.365`
+(commit `8c9361ba8180c1f4164c0bf79de2f6e817770b0d`) and match the published
+module's declarations. Both introductions come from the emitter.
+
+Use V 0.5.2 for the committed formatting, regenerate with the default setup
+command, and check for drift before submitting changes:
+
+```sh
+./scripts/generate.sh
+git diff --exit-code -- src/vulkan.v src/vulkan_video.v
+```
+
+The default-snapshot CI check enforces this correspondence. Historical registry
+lanes intentionally generate other API versions and are separate compatibility
+checks; do not copy those outputs into the committed current snapshots. In the
+published module, `REGISTRY_COMMIT` pins Vulkan-Headers, not Vulkan-Docs.
