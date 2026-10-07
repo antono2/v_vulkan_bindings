@@ -1,4 +1,5 @@
 #!/usr/bin/env python3 -i
+# Translates Khronos registry types, constants and commands into V declarations and wrappers.
 #
 # MIT License
 #
@@ -371,6 +372,9 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */""", file=self.outFile)
+            write('// Registry-generated Vulkan declarations; native handles follow Vulkan lifetime rules.', file=self.outFile)
+            write('// Regenerate in antono2/v_vulkan_bindings with scripts/generate.sh (or .ps1).', file=self.outFile)
+            write('// Do not edit declarations here; change src/vgenerator.py and the registry input.', file=self.outFile)
             write('module', 'vulkan', file=self.outFile)
             self.newline()
 

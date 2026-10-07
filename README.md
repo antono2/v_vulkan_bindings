@@ -127,3 +127,19 @@ tag examples should be labeled as examples rather than presented as the latest
 release. The public module's README is maintained in
 [`antono2/vulkan`](https://github.com/antono2/vulkan); include a companion update
 there when a generator change affects application users.
+
+## Source navigation and snapshot versions
+
+[`src/main.py`](src/main.py) configures Khronos registry traversal;
+[`src/vgenerator.py`](src/vgenerator.py) emits V declarations and owns their
+file introduction. Keep binding-purpose and regeneration guidance in that
+emitter so future generation preserves it. Upstream files in `vulkandocs/`
+retain their Khronos headers and are not maintained as local source.
+
+The committed `src/vulkan.v` snapshot reports header version 347, while
+`VERSION` currently selects v1.4.335. Do not treat those as interchangeable or
+copy this snapshot over a newer published module. A full regeneration/version
+reconciliation must review the API diff and ABI checks; this documentation
+change preserves the existing snapshot. Until that reconciliation, the two
+committed generated files are recorded coverage exceptions to the new emitter
+introduction. The published module records its own input revisions.
