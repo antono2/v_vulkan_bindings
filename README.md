@@ -11,7 +11,7 @@ This repository contains the generator and maintenance workflows.
 
 ## Quick start
 
-Requirements: Git, Python 3 with the `venv` module, and V if the generated
+Requirements: Git, Python 3 with the `venv` module and V if the generated
 files should be formatted. On Ubuntu or Debian, install the native
 prerequisites with:
 
@@ -22,7 +22,7 @@ sudo apt install -y git python3 python3-venv
 
 The setup script creates an isolated Python environment, checks out the
 Vulkan-Docs tag recorded by this generator checkout in `VERSION`, installs the
-Python dependency, and regenerates both binding files:
+Python dependency and regenerates both binding files:
 
 ```bash
 git clone https://github.com/antono2/v_vulkan_bindings.git
@@ -57,7 +57,7 @@ Platform extensions are selected with V compile flags derived from the
 registry's `<platform>` names. For example, `-d vulkan_xlib` includes the
 Xlib declarations and supplies `VK_USE_PLATFORM_XLIB_KHR` to the C compiler.
 XCB and Wayland have separate flags (`vulkan_xcb` and `vulkan_wayland`).
-The same rule applies to Android, Win32, Metal, and the other registry
+The same rule applies to Android, Win32, Metal and the other registry
 platforms. Extension name and spec-version constants remain available without
 the flag; platform types and commands require it and the platform's native
 development headers.
@@ -95,7 +95,7 @@ script; an installed SDK's registry version may differ.
 ## Publishing
 
 `update_bindings_and_push_to_vulkan.yml` checks the newest numeric Vulkan-Docs
-tag each day, regenerates the bindings against that tag, and opens a generated
+tag each day, regenerates the bindings against that tag and opens a generated
 pull request in
 [`antono2/vulkan`](https://github.com/antono2/vulkan). Review and merge it after
 the target repository's required checks pass. The registry snapshot then becomes
@@ -121,8 +121,8 @@ V. It publishes new `+vcompat.N` tags and never rewrites the historical tags.
 ## Documentation maintenance
 
 Include README review when changing setup, generation, platform selection,
-CI coverage, or publication behavior. Keep exact moving pins in `VERSION`,
-metadata files, and workflows, and link to those sources from prose. Historical
+CI coverage or publication behavior. Keep exact moving pins in `VERSION`,
+metadata files and workflows, and link to those sources from prose. Historical
 tag examples should be labeled as examples rather than presented as the latest
 release. The public module's README is maintained in
 [`antono2/vulkan`](https://github.com/antono2/vulkan); include a companion update
@@ -142,7 +142,7 @@ default setup command. The current snapshots use Vulkan-Docs `v1.4.365`
 module's declarations. Both introductions come from the emitter.
 
 Use V 0.5.2 for the committed formatting, regenerate with the default setup
-command, and check for drift before submitting changes:
+command and check for drift before submitting changes:
 
 ```sh
 ./scripts/generate.sh
