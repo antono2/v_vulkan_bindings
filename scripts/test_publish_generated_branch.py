@@ -123,7 +123,7 @@ class PublishTests(unittest.TestCase):
 
 
 class PullRequestRecoveryTests(unittest.TestCase):
-    def run_step(self, existing):
+    def run_step(self, existing, unchanged=False):
         workflow = (SCRIPT.parents[1] / '.github/workflows/'
                     'update_bindings_and_push_to_vulkan.yml').read_text()
         step = workflow.split('      - name: Open pull request if missing\n', 1)[1]
@@ -139,14 +139,19 @@ class PullRequestRecoveryTests(unittest.TestCase):
                           'if sys.argv[1:3] == ["pr", "list"]:\n'
                           '    print(os.environ["GH_TEST_EXISTING"])\n')
             gh.chmod(0o755)
+            fake_git = root / 'git'
+            fake_git.write_text('#!/usr/bin/env python3\nimport os, sys\n'
+                                'print(os.environ["GH_TEST_TREE"] if sys.argv[1] == "write-tree" else "base")\n')
+            fake_git.chmod(0o755)
             log = root / 'calls'
             result = subprocess.run(['bash', '-c', shell], check=True,
                                     capture_output=True, text=True,
                                     env={**os.environ, 'PATH': str(root) + os.pathsep + os.environ['PATH'],
                                          'GH_TEST_LOG': str(log), 'GH_TEST_EXISTING': existing,
+                                         'GH_TEST_TREE': 'base' if unchanged else 'candidate',
                                          'BRANCH_NAME': BRANCH, 'DEPLOY_TARGET_REPO': 'fixture/module',
                                          'RELEASE_VERSION': 'v1.4.366'})
-            return log.read_text().splitlines(), result.stdout
+            return log.read_text().splitlines() if log.exists() else [], result.stdout
 
     def test_existing_pr_is_read_only(self):
         calls, output = self.run_step('80')
@@ -156,6 +161,10 @@ class PullRequestRecoveryTests(unittest.TestCase):
     def test_missing_pr_is_created_after_a_noop_push(self):
         calls, _ = self.run_step('')
         self.assertEqual(calls, ['pr list', 'pr create'])
+
+    def test_forced_regeneration_matching_master_does_not_create_a_pr(self):
+        calls, _ = self.run_step('', unchanged=True)
+        self.assertEqual(calls, [])
 
 
 if __name__ == '__main__':
