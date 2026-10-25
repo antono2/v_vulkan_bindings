@@ -200,8 +200,7 @@ jobs:
             c/vendor/include/vulkan c/vendor/include/vk_video
           python3 updater/scripts/publish_generated_branch.py \
             "$BRANCH_NAME" "Generated bindings ${{ needs.versions.outputs.requested }}"
-      - name: Open or update pull request
-        if: steps.publish.outputs.pushed == 'true'
+      - name: Open pull request if missing
         env:
           BRANCH_NAME: ${{ needs.versions.outputs.branch }}
           GH_TOKEN: ${{ secrets.PUSH_VULKAN }}
@@ -216,7 +215,7 @@ jobs:
             --json number \
             --jq '.[0].number // empty')
           if [[ -n "$existing" ]]; then
-            echo "Updated existing pull request #$existing"
+            echo "Using existing pull request #$existing without modifying it"
             exit 0
           fi
           gh pr create \
