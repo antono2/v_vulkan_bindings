@@ -6,6 +6,7 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
+import textwrap
 import unittest
 from unittest.mock import patch
 
@@ -119,6 +120,42 @@ class PublishTests(unittest.TestCase):
             with self.assertRaises(subprocess.CalledProcessError):
                 publisher.publish(self.work, BRANCH, 'Generated bindings')
         self.assertEqual(self.revision(), self.base)
+
+
+class PullRequestRecoveryTests(unittest.TestCase):
+    def run_step(self, existing):
+        workflow = (SCRIPT.parents[1] / '.github/workflows/'
+                    'update_bindings_and_push_to_vulkan.yml').read_text()
+        step = workflow.split('      - name: Open pull request if missing\n', 1)[1]
+        # A skipped publisher must not skip recovery of a failed PR-create call.
+        self.assertNotIn('steps.publish.outputs.pushed', step.split('run: |', 1)[0])
+        shell = textwrap.dedent(step.split('        run: |\n', 1)[1])
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            gh = root / 'gh'
+            gh.write_text('#!/usr/bin/env python3\nimport os, sys\n'
+                          'with open(os.environ["GH_TEST_LOG"], "a") as log:\n'
+                          '    log.write(" ".join(sys.argv[1:3]) + "\\n")\n'
+                          'if sys.argv[1:3] == ["pr", "list"]:\n'
+                          '    print(os.environ["GH_TEST_EXISTING"])\n')
+            gh.chmod(0o755)
+            log = root / 'calls'
+            result = subprocess.run(['bash', '-c', shell], check=True,
+                                    capture_output=True, text=True,
+                                    env={**os.environ, 'PATH': str(root) + os.pathsep + os.environ['PATH'],
+                                         'GH_TEST_LOG': str(log), 'GH_TEST_EXISTING': existing,
+                                         'BRANCH_NAME': BRANCH, 'DEPLOY_TARGET_REPO': 'fixture/module',
+                                         'RELEASE_VERSION': 'v1.4.366'})
+            return log.read_text().splitlines(), result.stdout
+
+    def test_existing_pr_is_read_only(self):
+        calls, output = self.run_step('80')
+        self.assertEqual(calls, ['pr list'])
+        self.assertIn('without modifying it', output)
+
+    def test_missing_pr_is_created_after_a_noop_push(self):
+        calls, _ = self.run_step('')
+        self.assertEqual(calls, ['pr list', 'pr create'])
 
 
 if __name__ == '__main__':
