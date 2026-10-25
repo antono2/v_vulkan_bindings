@@ -207,6 +207,12 @@ jobs:
           RELEASE_VERSION: ${{ needs.versions.outputs.requested }}
         run: |
           set -euo pipefail
+          # A forced regeneration may also produce exactly the default branch.
+          # In that case there is no branch/PR to create or recover.
+          if [[ "$(git write-tree)" == "$(git rev-parse 'origin/master^{tree}')" ]]; then
+            echo 'Generated files already match master; no proposal needed.'
+            exit 0
+          fi
           existing=$(gh pr list \
             --repo "$DEPLOY_TARGET_REPO" \
             --base master \
