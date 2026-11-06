@@ -36,7 +36,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        version: [v1.4.363, v1.4.364]
+        version: [v1.4.363, v1.4.364, v1.4.368]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -61,6 +61,29 @@ jobs:
           v fmt -w src/vulkan.v src/vulkan_video.v
           v fmt -verify src/vulkan.v src/vulkan_video.v
           git diff --check
+      - name: Check out module support files for the opaque-pointer ABI probe
+        if: matrix.version == 'v1.4.368'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: antono2/vulkan
+          path: abi-modules/antono2/vulkan
+      - name: Check out matching C headers
+        if: matrix.version == 'v1.4.368'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: KhronosGroup/Vulkan-Headers
+          ref: ${{ matrix.version }}
+          path: abi-headers
+      - name: Compile and run the generated opaque-pointer ABI probe
+        if: matrix.version == 'v1.4.368'
+        env:
+          VMODULES: ${{ github.workspace }}/abi-modules
+          V_C_ERROR_BUG_REPORT_DISABLED: '1'
+        run: |
+          set -euo pipefail
+          cp src/vulkan.v src/vulkan_video.v abi-modules/antono2/vulkan/
+          cp -R abi-headers/include/. abi-modules/antono2/vulkan/c/vendor/include/
+          v -cc gcc run test/opaque_basetype
 
   windows-generator:
     name: Windows generator setup

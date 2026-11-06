@@ -797,7 +797,10 @@ fn C.volkLoadDevice(Device)''', file=self.outFile)
             elif v_value and v_text and category == 'basetype':
                 if not self.should_emit_external_basetype(v_value):
                     return
-                body = 'pub type ' + v_value + ' = C.' + v_value + '\n@[typedef]\npub struct C.' + v_value + ' {}'
+                # The V alias drops Vk, but the C typedef must keep its registry name.
+                # Opaque pointer basetypes such as VkInternalHandleNV are not C structs
+                # named InternalHandleNV.
+                body = 'pub type ' + v_value + ' = C.' + name + '\n@[typedef]\npub struct C.' + name + ' {}'
             else:
                 if category == 'include' or category == 'define':
                     #NOTE: Since video structs are translated to V in vulkan_video.v,
