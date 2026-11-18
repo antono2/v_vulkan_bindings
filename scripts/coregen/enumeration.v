@@ -157,9 +157,9 @@ fn emit_wide_flags(group EnumGroup) !string {
 	return lines.join('\n') + '\n'
 }
 
-fn emit_group(group EnumGroup) !string {
+fn emit_group(group EnumGroup, alias string) !string {
 	if group.alias != '' {
-		return 'pub type ${group.name} = ${group.alias}'
+		return 'pub type ${group.name} = ${alias}'
 	}
 	if group.wide {
 		if group.bitwidth > 64 {

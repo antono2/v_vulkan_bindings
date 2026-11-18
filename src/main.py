@@ -270,6 +270,8 @@ if __name__ == '__main__':
             'groups': gen.group_plan,
             'callbacks': gen.callback_plan,
             'defines': gen.define_plan,
+            'types': gen.type_plan,
+            'type_events': gen.type_events,
         }
         pathlib.Path(args.command_plan).write_text(json.dumps(plan), encoding='utf-8')
 

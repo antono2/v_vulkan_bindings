@@ -9,6 +9,7 @@ const constant_marker = '// VULKAN_CORE_CONSTANT_SLOT '
 const struct_marker = '// VULKAN_CORE_STRUCT_SLOT '
 const callback_marker = '// VULKAN_CORE_CALLBACK_SLOT '
 const define_marker = '// VULKAN_CORE_DEFINE_SLOT '
+const type_marker = '// VULKAN_CORE_TYPE_SLOT '
 
 const primitive_types = ['bool', 'string', 'i8', 'u8', 'i16', 'u16', 'int', 'i32', 'u32', 'i64',
 	'u64', 'i128', 'u128', 'rune', 'f32', 'f64', 'isize', 'usize', 'voidptr']
@@ -74,23 +75,25 @@ struct Command {
 	name        string
 	return_type string
 	parameters  []Parameter
-	value_types []string
+	type_order  int
 }
 
 // BindingPlan preserves the order and type availability from feature traversal.
 pub struct BindingPlan {
-	type_names []string
-	commands   []Command
-	structs    []Aggregate
-	constants  []StandaloneConstant
-	groups     []EnumGroup
-	callbacks  []Callback
-	defines    []RegistryDefine
+	type_names  []string
+	commands    []Command
+	structs     []Aggregate
+	constants   []StandaloneConstant
+	groups      []EnumGroup
+	callbacks   []Callback
+	defines     []RegistryDefine
+	types       []RegistryType
+	type_events []TypeEvent
 }
 
 struct CommandEmitter {
 	known_types map[string]bool
-	value_types []string
+	value_at    map[string]int
 }
 
 fn remove_prefix(name string) string {
@@ -200,7 +203,8 @@ fn (emitter CommandEmitter) emit(command Command) string {
 		base := c_type.trim_left('&').trim_string_left('C.Vk')
 		mutable := !parameter.constant
 			&& (parameter.suffix.contains('*') || parameter.array_size != '')
-			&& base !in primitive_types && base !in emitter.value_types
+			&& base !in primitive_types
+			&& !is_visited_value(base, command.type_order, emitter.value_at)
 		if mutable && !name.starts_with('mut_') {
 			name = 'mut_${name}'
 		}
@@ -239,6 +243,7 @@ pub fn emit_bindings(template string, plan BindingPlan) !string {
 	for name in plan.type_names {
 		known[name] = true
 	}
+	mut types := resolve_types(plan, known)!
 	mut groups := map[string]EnumGroup{}
 	for group in plan.groups {
 		if group.name in groups {
@@ -282,7 +287,7 @@ pub fn emit_bindings(template string, plan BindingPlan) !string {
 				return error('unexpected command slot "${line}"')
 			}
 			command := plan.commands[command_count]
-			emitter := CommandEmitter{known, command.value_types}
+			emitter := CommandEmitter{known, types.value_at}
 			output.write_string(emitter.emit(command))
 			command_count++
 		} else if line.starts_with(struct_marker) {
@@ -290,12 +295,14 @@ pub fn emit_bindings(template string, plan BindingPlan) !string {
 				|| line != struct_marker + plan.structs[struct_count].name {
 				return error('unexpected struct slot "${line}"')
 			}
-			output.write_string(emit_aggregate(plan.structs[struct_count], known, structure_types)!)
+			aggregate := plan.structs[struct_count]
+			output.write_string(emit_aggregate(aggregate, known, structure_types,
+				types.aliases[remove_prefix(aggregate.name)])!)
 			struct_count++
 		} else if line.starts_with(group_marker) {
 			name := line[group_marker.len..]
 			group := groups[name] or { return error('unexpected enum slot "${line}"') }
-			output.write_string(emit_group(group)!)
+			output.write_string(emit_group(group, types.aliases[name])!)
 			groups.delete(name)
 		} else if line.starts_with(constant_marker) {
 			name := line[constant_marker.len..]
@@ -305,13 +312,21 @@ pub fn emit_bindings(template string, plan BindingPlan) !string {
 		} else if line.starts_with(callback_marker) {
 			name := line[callback_marker.len..]
 			callback := callbacks[name] or { return error('unexpected callback slot "${line}"') }
-			output.write_string(emit_callback(callback, known))
+			output.write_string(emit_callback(callback, known, types.value_at))
 			callbacks.delete(name)
 		} else if line.starts_with(define_marker) {
 			name := line[define_marker.len..]
 			decl := defines[name] or { return error('unexpected define slot "${line}"') }
 			output.write_string(emit_define(decl)!)
 			defines.delete(name)
+		} else if line.starts_with(type_marker) {
+			name := line[type_marker.len..]
+			decl := types.type_slots[name] or { return error('unexpected type slot "${line}"') }
+			types.type_slots.delete(name)
+			if decl == '' {
+				continue
+			}
+			output.write_string(decl)
 		} else {
 			output.write_string(line)
 		}
@@ -334,6 +349,9 @@ pub fn emit_bindings(template string, plan BindingPlan) !string {
 	}
 	if defines.len != 0 || plan.defines.len == 0 {
 		return error('${defines.len} of ${plan.defines.len} Vulkan defines left in the plan')
+	}
+	if types.type_slots.len != 0 || plan.types.len == 0 {
+		return error('${types.type_slots.len} of ${plan.types.len} Vulkan types left in the plan')
 	}
 	return output.str()
 }

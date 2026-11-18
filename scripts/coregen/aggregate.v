@@ -63,10 +63,10 @@ fn deprecation_comment(name string, reason string) !string {
 	}
 }
 
-fn emit_aggregate(aggregate Aggregate, known_types map[string]bool, structure_types StructureTypes) !string {
+fn emit_aggregate(aggregate Aggregate, known_types map[string]bool, structure_types StructureTypes, alias_target string) !string {
 	name := remove_prefix(aggregate.name)
 	if aggregate.alias != '' {
-		return 'pub type ${name} = ${aggregate.alias}'
+		return 'pub type ${name} = ${alias_target}'
 	}
 	origin := 'C.${aggregate.name}'
 	translator := CommandEmitter{
