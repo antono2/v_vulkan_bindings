@@ -342,6 +342,7 @@ class VOutputGenerator(OutputGenerator):
         self.struct_plan = []
         self.constant_plan = []
         self.group_plan = []
+        self.callback_plan = []
         self.may_alias = None
         self.fixed_array_aliases = []
         self.emitted_platform_flags = set()
@@ -1235,6 +1236,43 @@ fn C.volkLoadDevice(Device)''', file=self.outFile)
         body += '\n'
         return ('struct', body)
 
+    def record_callback(self, elem, name):
+        proto = elem.find('proto')
+        legacy = proto is None
+        if legacy:
+            # Older registries put the prototype and parameter names in mixed XML content.
+            return_type = noneStr(elem.text)
+            suffix = ''
+            params = [{'c_type': item.text, 'suffix': noneStr(item.tail)} for item in elem.findall('type')]
+            callback_name = elem.findtext('name') or name
+        else:
+            return_element = proto.find('type')
+            return_type = proto.findtext('type', '')
+            suffix = noneStr(return_element.tail) if return_element is not None else ''
+            params = []
+            for param in elem.findall('param'):
+                type_element = param.find('type')
+                param_name = param.findtext('name')
+                if type_element is not None and param_name is not None:
+                    params.append({
+                        'name': param_name.strip(),
+                        'c_type': type_element.text,
+                        'suffix': noneStr(type_element.tail),
+                        'indirection': self.param_has_indirection(param),
+                        'constant': self.param_is_const(param),
+                    })
+            callback_name = proto.findtext('name') or name
+        callback_name = callback_name.strip()
+        self.callback_plan.append({
+            'name': callback_name,
+            'return_type': return_type,
+            'suffix': suffix,
+            'legacy': legacy,
+            'parameters': params,
+            'value_types': self.current_value_types(),
+        })
+        self.appendSection('struct', f'// VULKAN_CORE_CALLBACK_SLOT {callback_name}')
+
     def build_legacy_funcpointer_type_decl(self, typeElem, name):
         """Read the flat funcpointer representation used by older registries."""
         name_elem = typeElem.find('name')
@@ -1301,14 +1339,17 @@ fn C.volkLoadDevice(Device)''', file=self.outFile)
                 'optional': param.get('optional', ''),
                 'no_auto': param.get('noautovalidity') == 'true',
             })
-        value_types = set(self.ENUM_TYPES)
-        value_types.update(alias for alias, base in self.ALIAS_TO_BASE_TYPE_MAP.items()
-                           if base in self.BASE_TYPES_ARR)
         self.command_plan.append({
             'name': name,
             'return_type': command.findtext('proto/type'),
             'parameters': params,
-            'value_types': sorted(value_types),
+            'value_types': self.current_value_types(),
+        })
+
+    def current_value_types(self):
+        return sorted(set(self.ENUM_TYPES) | {
+            alias for alias, base in self.ALIAS_TO_BASE_TYPE_MAP.items()
+            if base in self.BASE_TYPES_ARR
         })
 
     def misracstyle(self):
@@ -2226,6 +2267,10 @@ fn C.volkLoadDevice(Device)''', file=self.outFile)
 
         typeElem = typeinfo.elem
         category = typeElem.get('category')
+
+        if self.command_plan is not None and category == 'funcpointer':
+            self.record_callback(typeElem, name)
+            return
 
         # Normalize API version-style defines early so they do not fall through
         # into generic alias handling like `pub type API_VERSION_1_2 = voidptr`.
