@@ -34,7 +34,13 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      - run: python3 scripts/test_publish_generated_branch.py
+      - uses: prantlf/setup-v-action@92f20bea50d2c9931a28c96bb4997a3c7357baf0 # v4
+        with:
+          version: 0.5.2
+          install-dependencies: false
+      - run: |
+          v run scripts/publish_generated_branch.vsh --self-test
+          v run scripts/open_generated_proposal.vsh --self-test
 
   versions:
     needs: publisher-tests
@@ -178,6 +184,10 @@ jobs:
         with:
           name: v-vulkan-bindings-${{ needs.versions.outputs.requested }}
           path: generated
+      - uses: prantlf/setup-v-action@92f20bea50d2c9931a28c96bb4997a3c7357baf0 # v4
+        with:
+          version: 0.5.2
+          install-dependencies: false
       - name: Commit generated module to a release branch
         id: publish
         env:
@@ -198,35 +208,11 @@ jobs:
           git diff --check
           git add vulkan.v vulkan_video.v VERSION REGISTRY_COMMIT \
             c/vendor/include/vulkan c/vendor/include/vk_video
-          python3 updater/scripts/publish_generated_branch.py \
+          v run updater/scripts/publish_generated_branch.vsh \
             "$BRANCH_NAME" "Generated bindings ${{ needs.versions.outputs.requested }}"
       - name: Open pull request if missing
         env:
           BRANCH_NAME: ${{ needs.versions.outputs.branch }}
           GH_TOKEN: ${{ secrets.PUSH_VULKAN }}
           RELEASE_VERSION: ${{ needs.versions.outputs.requested }}
-        run: |
-          set -euo pipefail
-          # A forced regeneration may also produce exactly the default branch.
-          # In that case there is no branch/PR to create or recover.
-          if [[ "$(git write-tree)" == "$(git rev-parse 'origin/master^{tree}')" ]]; then
-            echo 'Generated files already match master; no proposal needed.'
-            exit 0
-          fi
-          existing=$(gh pr list \
-            --repo "$DEPLOY_TARGET_REPO" \
-            --base master \
-            --head "$BRANCH_NAME" \
-            --state open \
-            --json number \
-            --jq '.[0].number // empty')
-          if [[ -n "$existing" ]]; then
-            echo "Using existing pull request #$existing without modifying it"
-            exit 0
-          fi
-          gh pr create \
-            --repo "$DEPLOY_TARGET_REPO" \
-            --base master \
-            --head "$BRANCH_NAME" \
-            --title "Generated bindings $RELEASE_VERSION" \
-            --body "Automated bindings generated from KhronosGroup/Vulkan-Docs tag \`$RELEASE_VERSION\`. Once merged, this registry snapshot is available from the target module's master branch. Package release tags follow the semantic version in \`v.mod\` and are created separately."
+        run: v run updater/scripts/open_generated_proposal.vsh
