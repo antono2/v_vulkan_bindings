@@ -57,7 +57,7 @@ jobs:
         run: |
           set -euo pipefail
           python src/main.py -registry vulkandocs/xml/vk.xml vulkan.v
-          python src/main.py -registry vulkandocs/xml/video.xml vulkan_video.v
+          v run scripts/generate_video.vsh
           v fmt -w src/vulkan.v src/vulkan_video.v
           v fmt -verify src/vulkan.v src/vulkan_video.v
           git diff --check
@@ -148,14 +148,16 @@ jobs:
       - name: Build pinned V3 compiler
         run: |
           make -C .ci-v-source local=1
-          echo "$GITHUB_WORKSPACE/.ci-v-source" >> "$GITHUB_PATH"
           .ci-v-source/v version
+      - uses: prantlf/setup-v-action@92f20bea50d2c9931a28c96bb4997a3c7357baf0 # v4
+        with:
+          version: 0.5.2
       - name: Generate and type-check current bindings
         run: |
           set -euo pipefail
           python -m pip install --requirement .github/generator-requirements.txt
           python src/main.py -registry vulkandocs/xml/vk.xml vulkan.v
-          python src/main.py -registry vulkandocs/xml/video.xml vulkan_video.v
+          v run scripts/generate_video.vsh
 
           grep -F 'pub const khr_xlib_surface_extension_name' src/vulkan.v
           grep -F '$if vulkan_xlib ? {' src/vulkan.v
@@ -179,8 +181,8 @@ jobs:
           install -d "$RUNNER_TEMP/vmodules/antono2"
           ln -s "$GITHUB_WORKSPACE/published" \
             "$RUNNER_TEMP/vmodules/antono2/vulkan"
-          VMODULES="$RUNNER_TEMP/vmodules" v -new-compiler -check test/main.c.v
-          VMODULES="$RUNNER_TEMP/vmodules" v -new-compiler -d vulkan_xlib \
+          VMODULES="$RUNNER_TEMP/vmodules" .ci-v-source/v -new-compiler -check test/main.c.v
+          VMODULES="$RUNNER_TEMP/vmodules" .ci-v-source/v -new-compiler -d vulkan_xlib \
             -check test/main.c.v
 
   generate-and-compile:

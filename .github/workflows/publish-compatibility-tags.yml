@@ -87,7 +87,7 @@ jobs:
             git -C vulkandocs checkout --quiet --detach --force "refs/tags/$registry_version"
             git -C vulkanheaders checkout --quiet --detach --force "refs/tags/$registry_version"
             python src/main.py -registry vulkandocs/xml/vk.xml vulkan.v
-            python src/main.py -registry vulkandocs/xml/video.xml vulkan_video.v
+            v run scripts/generate_video.vsh
             v fmt -w src/vulkan.v
             v fmt -w src/vulkan_video.v
 

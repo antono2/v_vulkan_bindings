@@ -11,8 +11,9 @@ This repository contains the generator and maintenance workflows.
 
 ## Quick start
 
-Requirements: Git, Python 3 with the `venv` module and V if the generated
-files should be formatted. On Ubuntu or Debian, install the native
+Full regeneration requires Git, V 0.5.2 or newer and Python 3 with the
+`venv` module. Vulkan Video can be regenerated separately using only V and
+a copy of `video.xml`. On Ubuntu or Debian, install the native
 prerequisites with:
 
 ```bash
@@ -30,7 +31,8 @@ cd v_vulkan_bindings
 v run scripts/generate.vsh
 ```
 
-On Windows, run the equivalent PowerShell script:
+The same V command works on Windows. PowerShell users can also use the
+existing wrapper:
 
 ```powershell
 git clone https://github.com/antono2/v_vulkan_bindings.git
@@ -50,8 +52,8 @@ v run scripts/generate.vsh v1.4.362
 ```
 
 The script refuses to switch an existing `vulkandocs` checkout if it contains
-local changes. Generated files are written to `src/vulkan.v` and
-`src/vulkan_video.v`; review their diff before committing.
+tracked changes. The generated files are `src/vulkan.v` and
+`src/vulkan_video.v`. Review their diff before committing.
 
 Platform extensions are selected with V compile flags derived from the
 registry's `<platform>` names. For example, `-d vulkan_xlib` includes the
@@ -62,35 +64,41 @@ platforms. Extension name and spec-version constants remain available without
 the flag; platform types and commands require it and the platform's native
 development headers.
 
-## Manual generation
+## Generate Vulkan Video on its own
 
-The generator imports helper modules from a `vulkandocs` checkout at the
-repository root:
+With `vulkandocs/xml/video.xml` in place, run these commands from the repository root.
 
-```bash
-git clone --depth 1 --branch "$(cat VERSION)" \
-  https://github.com/KhronosGroup/Vulkan-Docs.git vulkandocs
-python3 -m venv .venv
-.venv/bin/python -m pip install -r .github/generator-requirements.txt
-.venv/bin/python src/main.py -registry vulkandocs/xml/vk.xml vulkan.v
-.venv/bin/python src/main.py -registry vulkandocs/xml/video.xml vulkan_video.v
-v fmt -w src/vulkan.v src/vulkan_video.v
+```sh
+v run scripts/generate_video.vsh
+v fmt -w src/vulkan_video.v
 ```
 
-## Using an installed registry
+| Option | Default | Use |
+| --- | --- | --- |
+| `--registry` | `vulkandocs/xml/video.xml` | Supply a Vulkan SDK registry or another copy of `video.xml`. |
+| `--output` | `src/vulkan_video.v` | Write to a different file to compare registry versions. |
+| `--help` | | Show usage. |
 
-The generator also needs the helper Python modules from a compatible
-`vulkandocs` checkout. After preparing those dependencies as above, you can
-point it at registry files installed by a Vulkan SDK. For example, on a Linux
-system that provides `/usr/share/vulkan/registry`:
+For example, this reads the Vulkan Video registry from a system SDK.
+
+```sh
+v run scripts/generate_video.vsh --registry /usr/share/vulkan/registry/video.xml
+v fmt -w src/vulkan_video.v
+```
+
+## Generate the core bindings on their own
+
+Prepare the pinned Vulkan-Docs checkout and Python environment with
+`v run scripts/generate.vsh`. The core generator uses Python helpers from
+that checkout and accepts an alternate registry path.
 
 ```sh
 .venv/bin/python src/main.py -registry /usr/share/vulkan/registry/vk.xml vulkan.v
-.venv/bin/python src/main.py -registry /usr/share/vulkan/registry/video.xml vulkan_video.v
+v fmt -w src/vulkan.v
 ```
 
-For reproducible output, prefer the pinned registry checkout used by the setup
-script; an installed SDK's registry version may differ.
+Use the pinned checkout for reproducible releases. An installed SDK may ship
+a different registry revision.
 
 ## Publishing
 
@@ -130,16 +138,17 @@ there when a generator change affects application users.
 
 ## Source navigation and snapshot versions
 
-[`src/main.py`](src/main.py) configures Khronos registry traversal;
-[`src/vgenerator.py`](src/vgenerator.py) emits V declarations and owns their
-file introduction. Keep binding-purpose and regeneration guidance in that
-emitter so future generation preserves it. Upstream files in `vulkandocs/`
+[`src/main.py`](src/main.py) configures Khronos registry traversal for the
+core bindings. [`src/vgenerator.py`](src/vgenerator.py) emits their V
+declarations. [`scripts/generate_video.vsh`](scripts/generate_video.vsh)
+reads the video registry and emits the Vulkan Video declarations. Each
+emitter supplies its generated file introduction. Upstream files in `vulkandocs/`
 retain their Khronos headers and are not maintained as local source.
 
 `VERSION` selects the registry tag for the committed snapshots as well as the
 default setup command. The current snapshots use Vulkan-Docs `v1.4.365`
 (commit `8c9361ba8180c1f4164c0bf79de2f6e817770b0d`) and match the published
-module's declarations. Both introductions come from the emitter.
+module's declarations.
 
 Use V 0.5.2 for the committed formatting, regenerate with the default setup
 command and check for drift before submitting changes:
