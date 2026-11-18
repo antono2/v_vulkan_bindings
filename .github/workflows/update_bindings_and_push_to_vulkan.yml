@@ -127,7 +127,7 @@ jobs:
         run: |
           set -euo pipefail
           python src/main.py -registry vulkandocs/xml/vk.xml vulkan.v
-          python src/main.py -registry vulkandocs/xml/video.xml vulkan_video.v
+          v run scripts/generate_video.vsh
           v fmt -w src/vulkan.v
           v fmt -w src/vulkan_video.v
           printf '%s\n' '${{ needs.versions.outputs.requested }}' > VERSION

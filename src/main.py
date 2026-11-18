@@ -222,7 +222,7 @@ if __name__ == '__main__':
     gen, options = genTarget(args)
     reg = Registry(gen, options)
 
-    args_registry = '../../' + args.registry
+    args_registry = script_path.parent / args.registry
     startTimer(args.time)
     tree = etree.parse(args_registry)
     # Older registries put a funcpointer's name directly under <type>.
