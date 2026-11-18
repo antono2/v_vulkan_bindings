@@ -4,6 +4,7 @@ import flag
 import os
 import strconv
 import strings
+import registryxml
 
 const scalar_types = {
 	'uint8_t':  'u8'
@@ -22,60 +23,22 @@ struct VideoRegistry {
 	extensions []xml.XMLNode
 }
 
-fn children(node xml.XMLNode, tag string) []xml.XMLNode {
-	mut result := []xml.XMLNode{}
-	for item in node.children {
-		if item is xml.XMLNode && item.name == tag {
-			result << item
-		}
-	}
-	return result
-}
-
-fn child_text(node xml.XMLNode, tag string) string {
-	for item in children(node, tag) {
-		return declaration_text(item).trim_space()
-	}
-	return ''
-}
-
-fn declaration_text(node xml.XMLNode) string {
-	mut text := ''
-	for item in node.children {
-		match item {
-			string {
-				text += item
-			}
-			xml.XMLNode {
-				if item.name != 'comment' {
-					text += declaration_text(item)
-				}
-			}
-			else {}
-		}
-	}
-	return text
-}
-
 fn read_registry(path string) !VideoRegistry {
-	doc := xml.XMLDocument.from_string(compact_attribute_separators(os.read_file(path)!))!
-	if doc.root.name != 'registry' {
-		return error('expected a Vulkan Video registry in ${path}')
-	}
+	registry := registryxml.read(path)!
 	mut types := map[string]xml.XMLNode{}
 	mut enums := map[string]xml.XMLNode{}
 	mut extensions := []xml.XMLNode{}
-	for section in children(doc.root, 'types') {
-		for node in children(section, 'type') {
-			name := node.attributes['name'] or { child_text(node, 'name') }
+	for section in registryxml.children(registry, 'types') {
+		for node in registryxml.children(section, 'type') {
+			name := node.attributes['name'] or { registryxml.child_text(node, 'name') }
 			types[name] = node
 		}
 	}
-	for group in children(doc.root, 'enums') {
+	for group in registryxml.children(registry, 'enums') {
 		enums[group.attributes['name']] = group
 	}
-	for section in children(doc.root, 'extensions') {
-		for extension in children(section, 'extension') {
+	for section in registryxml.children(registry, 'extensions') {
+		for extension in registryxml.children(section, 'extension') {
 			if 'vulkan' in extension.attributes['supported'].split(',') {
 				extensions << extension
 			}
@@ -150,7 +113,7 @@ fn enum_declaration(group xml.XMLNode) !string {
 	mut entries := []string{}
 	mut seen := map[i64]bool{}
 	mut signed := false
-	for entry in children(group, 'enum') {
+	for entry in registryxml.children(group, 'enum') {
 		// V enums cannot express two names for the same discriminant.
 		if 'alias' in entry.attributes {
 			continue
@@ -181,12 +144,12 @@ fn enum_declaration(group xml.XMLNode) !string {
 }
 
 fn field_declaration(member xml.XMLNode) !(string, string) {
-	c_type := child_text(member, 'type')
-	field := child_text(member, 'name')
+	c_type := registryxml.child_text(member, 'type')
+	field := registryxml.child_text(member, 'name')
 	if c_type == '' || field == '' {
 		return error('invalid Vulkan Video struct member')
 	}
-	declaration := declaration_text(member)
+	declaration := registryxml.declaration_text(member)
 	_, suffix := declaration.split_once(c_type) or { return error('missing type for ${field}') }
 	pointer, array := suffix.split_once(field) or { return error('missing name for ${field}') }
 	base := scalar_types[c_type] or { c_type }
@@ -211,7 +174,7 @@ fn struct_declaration(node xml.XMLNode, name string) !string {
 	}
 	mut aliases := []string{}
 	mut fields := []string{}
-	for member in children(node, 'member') {
+	for member in registryxml.children(node, 'member') {
 		field, field_type := field_declaration(member)!
 		if field[0] >= `A` && field[0] <= `Z` && field_type.starts_with('[') {
 			// V3 interprets a PascalCase field followed by [] as an embedded type.
@@ -248,8 +211,8 @@ fn define_declaration(node xml.XMLNode, name string) !string {
 		return 'pub fn make_video_std_version(major u32, minor u32, patch u32) u32 {\n' +
 			'return (major << 22) | (minor << 12) | patch\n}'
 	}
-	if child_text(node, 'type') == 'VK_MAKE_VIDEO_STD_VERSION' {
-		_, call := declaration_text(node).split_once('VK_MAKE_VIDEO_STD_VERSION') or {
+	if registryxml.child_text(node, 'type') == 'VK_MAKE_VIDEO_STD_VERSION' {
+		_, call := registryxml.declaration_text(node).split_once('VK_MAKE_VIDEO_STD_VERSION') or {
 			return error('missing version macro for ${name}')
 		}
 		return 'pub const ${constant_name(name)} = make_video_std_version${call.trim_space()}'
@@ -284,18 +247,19 @@ fn (registry VideoRegistry) emit_type(name string, allowed map[string]bool, cons
 			registry.emit_type(dependency, allowed, constants, mut emitted, mut output)!
 		}
 	}
-	for item in children(node, 'type') {
-		registry.emit_type(declaration_text(item).trim_space(), allowed, constants, mut emitted, mut
-			output)!
+	for item in registryxml.children(node, 'type') {
+		registry.emit_type(registryxml.declaration_text(item).trim_space(), allowed, constants, mut
+			emitted, mut output)!
 	}
-	members := children(node, 'member')
+	members := registryxml.children(node, 'member')
 	for member in members {
-		registry.emit_type(child_text(member, 'type'), allowed, constants, mut emitted, mut output)!
+		registry.emit_type(registryxml.child_text(member, 'type'), allowed, constants, mut emitted, mut
+			output)!
 	}
 	// Emit array bounds when first used, matching the historical registry traversal.
 	for member in members {
-		for bound in children(member, 'enum') {
-			if constant := constants[declaration_text(bound).trim_space()] {
+		for bound in registryxml.children(member, 'enum') {
+			if constant := constants[registryxml.declaration_text(bound).trim_space()] {
 				emit_constant(constant, mut emitted, mut output)!
 			}
 		}
@@ -329,24 +293,24 @@ fn (registry VideoRegistry) generate() !string {
 	]
 	mut emitted := map[string]bool{}
 	for extension in registry.extensions {
-		requirements := children(extension, 'require')
+		requirements := registryxml.children(extension, 'require')
 		mut allowed := map[string]bool{}
 		mut constants := map[string]xml.XMLNode{}
 		for requirement in requirements {
-			for item in children(requirement, 'type') {
+			for item in registryxml.children(requirement, 'type') {
 				allowed[item.attributes['name']] = true
 			}
-			for item in children(requirement, 'enum') {
+			for item in registryxml.children(requirement, 'enum') {
 				constants[item.attributes['name']] = item
 			}
 		}
 		mut output := ExtensionDeclarations{}
 		for requirement in requirements {
-			for item in children(requirement, 'type') {
+			for item in registryxml.children(requirement, 'type') {
 				registry.emit_type(item.attributes['name'], allowed, constants, mut emitted, mut
 					output)!
 			}
-			for item in children(requirement, 'enum') {
+			for item in registryxml.children(requirement, 'enum') {
 				emit_constant(item, mut emitted, mut output)!
 			}
 		}
@@ -388,57 +352,6 @@ fn run(args []string) ! {
 	registry := read_registry(path)!
 	source := registry.generate()!
 	os.write_file(output, source)!
-}
-
-// The oldest supported V XML reader expects compact attribute separators.
-fn compact_attribute_separators(input string) string {
-	mut output := strings.new_builder(input.len)
-	mut in_tag := false
-	mut quote := u8(0)
-	for i := 0; i < input.len; {
-		byte := input[i]
-		if !in_tag && byte == `<` && i + 1 < input.len {
-			mut terminator := ''
-			for delimiter in [['<!--', '-->'], ['<![CDATA[', ']]>']] {
-				if i + delimiter[0].len <= input.len
-					&& input[i..i + delimiter[0].len] == delimiter[0] {
-					terminator = delimiter[1]
-					break
-				}
-			}
-			if terminator != '' {
-				end := input.index_after(terminator, i + 2) or { input.len - terminator.len }
-				last := end + terminator.len
-				output.write_string(input[i..last])
-				i = last
-				continue
-			}
-			in_tag = input[i + 1].is_letter() || input[i + 1] == `_` || input[i + 1] == `?`
-		}
-		if in_tag {
-			if quote != 0 {
-				if byte == quote {
-					quote = 0
-				}
-			} else if byte == `"` || byte == 39 {
-				quote = byte
-			} else if byte == `>` {
-				in_tag = false
-			} else if byte in [u8(32), 9, 10, 13] {
-				start := i
-				for i < input.len && input[i] in [u8(32), 9, 10, 13] {
-					i++
-				}
-				if (i >= input.len || input[i] != `=`) && (start == 0 || input[start - 1] != `=`) {
-					output.write_string(input[start..i])
-				}
-				continue
-			}
-		}
-		output.write_u8(byte)
-		i++
-	}
-	return output.str()
 }
 
 run(os.args[1..]) or {

@@ -22,13 +22,6 @@ fn generate(args []string) ! {
 		return error('invalid Vulkan-Docs tag: ${registry_ref}')
 	}
 	docs := os.join_path(root, 'vulkandocs')
-	venv := os.join_path(root, '.venv')
-	python_name := os.getenv_opt('PYTHON') or {
-		if os.user_os() == 'windows' { 'python' } else { 'python3' }
-	}
-	python := os.find_abs_path_of_executable(python_name) or {
-		return error('${python_name} is required by the registry generator')
-	}
 	if !os.exists(os.join_path(docs, '.git')) {
 		if os.exists(docs) {
 			return error('vulkandocs exists but is not a Git checkout')
@@ -43,20 +36,7 @@ fn generate(args []string) ! {
 		run(['git', '-C', docs, 'fetch', '--depth', '1', 'origin', 'refs/tags/${registry_ref}'])!
 		run(['git', '-C', docs, 'checkout', '--quiet', '--detach', 'FETCH_HEAD'])!
 	}
-	venv_python := if os.user_os() == 'windows' {
-		os.join_path(venv, 'Scripts', 'python.exe')
-	} else {
-		os.join_path(venv, 'bin', 'python')
-	}
-	if !os.is_file(venv_python) {
-		run([python, '-m', 'venv', venv])!
-	}
-	run([venv_python, '-m', 'pip', '--version']) or {
-		return error('.venv is incomplete; move or remove it, then run this script again')
-	}
-	run([venv_python, '-m', 'pip', 'install', '--quiet', '--requirement',
-		'.github/generator-requirements.txt'])!
-	run([@VEXE, 'run', 'scripts/generate_core.vsh', '--python', venv_python])!
+	run([@VEXE, 'run', 'scripts/generate_core.vsh'])!
 	run([@VEXE, 'run', 'scripts/generate_video.vsh'])!
 	run([@VEXE, 'fmt', '-w', 'src/vulkan.v', 'src/vulkan_video.v'])!
 	println('Generated Vulkan bindings from Vulkan-Docs ${registry_ref}')

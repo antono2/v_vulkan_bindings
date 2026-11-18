@@ -116,17 +116,10 @@ jobs:
       - uses: prantlf/setup-v-action@92f20bea50d2c9931a28c96bb4997a3c7357baf0 # v4
         with:
           version: 0.5.2
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
-        with:
-          python-version: "3.x"
-          cache: pip
-          cache-dependency-path: .github/generator-requirements.txt
-      - name: Install generator dependencies
-        run: python -m pip install --requirement .github/generator-requirements.txt
       - name: Generate bindings
         run: |
           set -euo pipefail
-          v run scripts/generate_core.vsh --python python
+          v run scripts/generate_core.vsh
           v run scripts/generate_video.vsh
           v fmt -w src/vulkan.v
           v fmt -w src/vulkan_video.v
