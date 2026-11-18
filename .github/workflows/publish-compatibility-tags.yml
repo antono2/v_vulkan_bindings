@@ -86,7 +86,7 @@ jobs:
             echo "Generating $compat_tag from Vulkan registry $registry_version"
             git -C vulkandocs checkout --quiet --detach --force "refs/tags/$registry_version"
             git -C vulkanheaders checkout --quiet --detach --force "refs/tags/$registry_version"
-            python src/main.py -registry vulkandocs/xml/vk.xml vulkan.v
+            v run scripts/generate_core.vsh --python python
             v run scripts/generate_video.vsh
             v fmt -w src/vulkan.v
             v fmt -w src/vulkan_video.v

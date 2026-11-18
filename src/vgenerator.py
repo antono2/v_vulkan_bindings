@@ -338,6 +338,7 @@ class VOutputGenerator(OutputGenerator):
         # Internal state - accumulators for different inner block text
         self.sections = {section: [] for section in self.ALL_SECTIONS}
         self.feature_not_empty = False
+        self.command_plan = None
         self.may_alias = None
         self.fixed_array_aliases = []
         self.emitted_platform_flags = set()
@@ -381,7 +382,7 @@ SOFTWARE.
             # The primary Vulkan module owns the Volk implementation through
             # its hand-written vulkan.c submodule. Keep this integration in
             # generated output so publishing new bindings cannot remove it.
-            if self.genOpts.filename.endswith('/vulkan.v'):
+            if self.genOpts.filename.replace('\\', '/').endswith('/vulkan.v'):
                 write('''import vulkan.c as _
 
 #include "c/loader_bridge.h"
@@ -1172,11 +1173,46 @@ fn C.volkLoadDevice(Device)''', file=self.outFile)
 
         if self.genOpts is None:
             raise MissingGeneratorOptionsError()
+        if self.command_plan is not None:
+            self.recordCommand(cmdinfo.elem, name)
+            self.appendSection('command', f'// VULKAN_CORE_COMMAND_SLOT {name}\n')
+            return
         prefix = ''
         decls = self.makeVDecls(cmdinfo.elem)
         self.appendSection('command', prefix + decls[0] + '\n')
         if self.genOpts.genFuncPointers:
             self.appendSection('commandPointer', decls[1])
+
+    def recordCommand(self, command, name):
+        """Pass registry traversal order and ABI declarations to the V emitter."""
+        params = []
+        for param in command.findall('param'):
+            type_element = param.find('type')
+            name_element = param.find('name')
+            suffix_parts = (noneStr(name_element.tail),
+                            *(noneStr(item.text) + noneStr(item.tail)
+                              for item in list(param)[list(param).index(name_element) + 1:]))
+            dimensions = re.findall(r'\[(\w+)\]', ''.join(suffix_parts))
+            if len(dimensions) > 1:
+                raise ValueError(f'{name} has a multidimensional parameter {name_element.text}')
+            params.append({
+                'name': name_element.text,
+                'c_type': type_element.text,
+                'suffix': noneStr(type_element.tail).strip(),
+                'array_size': dimensions[0] if dimensions else '',
+                'constant': self.param_is_const(param),
+                'optional': param.get('optional', ''),
+                'no_auto': param.get('noautovalidity') == 'true',
+            })
+        value_types = set(self.ENUM_TYPES)
+        value_types.update(alias for alias, base in self.ALIAS_TO_BASE_TYPE_MAP.items()
+                           if base in self.BASE_TYPES_ARR)
+        self.command_plan.append({
+            'name': name,
+            'return_type': command.findtext('proto/type'),
+            'parameters': params,
+            'value_types': sorted(value_types),
+        })
 
     def misracstyle(self):
         return self.genOpts.misracstyle

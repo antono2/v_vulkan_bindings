@@ -126,7 +126,7 @@ jobs:
       - name: Generate bindings
         run: |
           set -euo pipefail
-          python src/main.py -registry vulkandocs/xml/vk.xml vulkan.v
+          v run scripts/generate_core.vsh --python python
           v run scripts/generate_video.vsh
           v fmt -w src/vulkan.v
           v fmt -w src/vulkan_video.v

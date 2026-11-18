@@ -7,6 +7,7 @@
 
 import argparse
 import inspect
+import json
 import os
 import pathlib
 import pdb
@@ -159,6 +160,12 @@ def genTarget(args):
     logDiag('* options.emitExtensions    =', options.emitExtensions)
 
     gen = createGenerator(errFile=errWarn, warnFile=errWarn, diagFile=diag)
+    if args.command_plan:
+        if args.target != 'vulkan.v' or not args.output_file:
+            raise ValueError('a command plan requires the core Vulkan target and staging output')
+        gen.command_plan = []
+        options.filename = str(pathlib.Path(args.output_file).resolve())
+
     return (gen, options)
 
 
@@ -202,6 +209,8 @@ if __name__ == '__main__':
     parser.add_argument('-verbose', action='store_false', dest='quiet', default=True,
                         help='Enable script output during normal execution.')
 
+    parser.add_argument('--command-plan', help=argparse.SUPPRESS)
+    parser.add_argument('--output-file', help=argparse.SUPPRESS)
     args = parser.parse_args()
     args.feature = [name for arg in args.feature for name in arg.split()]
     args.extension = [name for arg in args.extension for name in arg.split()]
@@ -251,6 +260,13 @@ if __name__ == '__main__':
         startTimer(args.time)
         reg.apiGen()
         endTimer(args.time, '* Time to generate ' + options.filename + ' =')
+
+    if args.command_plan:
+        plan = {
+            'type_names': [name for name in reg.typedict if isinstance(name, str)],
+            'commands': gen.command_plan,
+        }
+        pathlib.Path(args.command_plan).write_text(json.dumps(plan), encoding='utf-8')
 
     if not args.quiet:
         logDiag('* Generated', options.filename)

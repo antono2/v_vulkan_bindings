@@ -56,7 +56,7 @@ jobs:
       - name: Generate and format both bindings
         run: |
           set -euo pipefail
-          python src/main.py -registry vulkandocs/xml/vk.xml vulkan.v
+          v run scripts/generate_core.vsh --python python
           v run scripts/generate_video.vsh
           v fmt -w src/vulkan.v src/vulkan_video.v
           v fmt -verify src/vulkan.v src/vulkan_video.v
@@ -156,7 +156,7 @@ jobs:
         run: |
           set -euo pipefail
           python -m pip install --requirement .github/generator-requirements.txt
-          python src/main.py -registry vulkandocs/xml/vk.xml vulkan.v
+          v run scripts/generate_core.vsh --python python
           v run scripts/generate_video.vsh
 
           grep -F 'pub const khr_xlib_surface_extension_name' src/vulkan.v
