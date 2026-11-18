@@ -90,8 +90,8 @@ v fmt -w src/vulkan_video.v
 
 Prepare the pinned Vulkan-Docs checkout and Python environment with
 `v run scripts/generate.vsh`. The core generator uses Python helpers from
-that checkout for registry traversal. It emits Vulkan command wrappers and
-function-pointer signatures in V.
+that checkout for registry traversal. V emits standalone constants, C-backed
+structs and unions, command wrappers, and function-pointer signatures.
 
 ```sh
 v run scripts/generate_core.vsh --registry /usr/share/vulkan/registry/vk.xml
@@ -146,11 +146,11 @@ there when a generator change affects application users.
 ## Source navigation and snapshot versions
 
 [`src/main.py`](src/main.py) configures Khronos registry traversal for the
-core bindings. [`src/vgenerator.py`](src/vgenerator.py) emits their type and
-constant declarations, and [`scripts/coregen/command.v`](scripts/coregen/command.v)
-emits command wrappers and their function-pointer types. [`scripts/generate_video.vsh`](scripts/generate_video.vsh)
-reads the video registry and emits the Vulkan Video declarations. Each
-emitter supplies its generated file introduction. Upstream files in `vulkandocs/`
+core bindings. [`src/vgenerator.py`](src/vgenerator.py) emits the header
+and the remaining enums, aliases, and defines.
+[`scripts/coregen/`](scripts/coregen/) emits imported aggregates, standalone
+constants, and commands. [`scripts/generate_video.vsh`](scripts/generate_video.vsh)
+reads the video registry and emits the Vulkan Video declarations. Upstream files in `vulkandocs/`
 retain their Khronos headers and are not maintained as local source.
 
 `VERSION` selects the registry tag for the committed snapshots as well as the

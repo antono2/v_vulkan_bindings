@@ -1,4 +1,4 @@
-// Generate the core Vulkan module and emit its command wrappers in V.
+// Generate the core Vulkan module with the V declaration emitter.
 import flag
 import os
 import rand
@@ -32,15 +32,15 @@ fn generate(args []string) ! {
 	os.mkdir(directory)!
 	defer { os.rmdir_all(directory) or {} }
 	source_path := os.join_path(directory, 'vulkan.v')
-	plan_path := os.join_path(directory, 'commands.json')
+	plan_path := os.join_path(directory, 'declarations.json')
 	result := os.exec([python, os.join_path(root, 'src', 'main.py'), '-registry', os.abs_path(registry),
 		'--output-file', source_path, '--command-plan', plan_path, 'vulkan.v'])
 	if result.exit_code != 0 {
 		return error('Vulkan registry traversal failed\n${result.output}')
 	}
 	template := os.read_file(source_path)!.replace('\r\n', '\n')
-	plan := json2.decode[coregen.CommandPlan](os.read_file(plan_path)!)!
-	source := coregen.emit_commands(template, plan)!
+	plan := json2.decode[coregen.BindingPlan](os.read_file(plan_path)!)!
+	source := coregen.emit_bindings(template, plan)!
 	os.write_file(output, source)!
 }
 

@@ -339,6 +339,8 @@ class VOutputGenerator(OutputGenerator):
         self.sections = {section: [] for section in self.ALL_SECTIONS}
         self.feature_not_empty = False
         self.command_plan = None
+        self.struct_plan = []
+        self.constant_plan = []
         self.may_alias = None
         self.fixed_array_aliases = []
         self.emitted_platform_flags = set()
@@ -474,6 +476,9 @@ fn C.volkLoadDevice(Device)''', file=self.outFile)
                         constant_prefix = f'pub const {self.featureName}_'
                         for entry in self.sections['enum']:
                             stripped = entry.strip()
+                            marker = '// VULKAN_CORE_CONSTANT_SLOT '
+                            if stripped.startswith(marker):
+                                stripped = 'pub const ' + self.removeVk(stripped[len(marker):].lower())
                             if stripped.startswith(constant_prefix) and (
                                 stripped.startswith(constant_prefix + 'spec_version') or
                                 stripped.startswith(constant_prefix + 'extension_name')
@@ -889,6 +894,11 @@ fn C.volkLoadDevice(Device)''', file=self.outFile)
         typeElem = typeinfo.elem
         typeNameOrig = typeName
         typeName = self.removeVk(typeName)
+        if self.command_plan is not None:
+            self.recordStruct(typeElem, typeNameOrig, typeName, alias, protect)
+            self.appendSection('struct', f'// VULKAN_CORE_STRUCT_SLOT {typeNameOrig}\n')
+            return
+
         body = self.deprecationComment(typeElem)
 
         if alias:
@@ -938,6 +948,41 @@ fn C.volkLoadDevice(Device)''', file=self.outFile)
 
         self.appendSection('struct', body)
 
+    def recordStruct(self, element, c_name, name, alias, protect):
+        """Pass C aggregates and the registry's guard context to the V emitter."""
+        if alias:
+            _, target = self.v_translate_c_name_to_basetype(name, alias)
+            self.struct_plan.append({'name': c_name, 'alias': target})
+            return
+
+        self.ALIAS_TO_BASE_TYPE_MAP.setdefault(name, 'C.' + c_name)
+        protect_begin, protect_end = self.genProtectString(element.get('protect') or protect)
+        members = []
+        for member in element.findall('.//member'):
+            type_element = member.find('type')
+            name_element = member.find('name')
+            parts = list(member)
+            suffix = noneStr(name_element.tail)
+            suffix += ''.join(noneStr(item.text) + noneStr(item.tail)
+                              for item in parts[parts.index(name_element) + 1:]
+                              if item.tag == 'enum')
+            members.append({
+                'name': name_element.text,
+                'c_type': type_element.text,
+                'suffix': noneStr(type_element.tail).strip(),
+                'dimensions': re.findall(r'\[(\w+)\]', suffix),
+                'literal_dimensions': noneStr(name_element.tail).count('['),
+                'deprecation': member.get('deprecated', ''),
+            })
+        self.struct_plan.append({
+            'name': c_name,
+            'category': element.get('category'),
+            'deprecated': element.get('deprecated', ''),
+            'extends': element.get('structextends', '') if self.genOpts.genStructExtendsComment else '',
+            'protect_begin': protect_begin, 'protect_end': protect_end,
+            'members': members,
+        })
+
     def genGroup(self, groupinfo, groupName, alias=None, protect=None):
         """Generate groups (e.g. C "enum" type).
 
@@ -984,6 +1029,14 @@ fn C.volkLoadDevice(Device)''', file=self.outFile)
 
         OutputGenerator.genEnum(self, enuminfo, name, alias)
         body = self.deprecationComment(enuminfo.elem)
+        if self.command_plan is not None:
+            _, value = self.enumToValue(enuminfo.elem, False)
+            self.constant_plan.append({
+                'name': name, 'value': value,
+                'c_type': '' if alias else enuminfo.elem.get('type', ''),
+            })
+            self.appendSection('enum', body + f'// VULKAN_CORE_CONSTANT_SLOT {name}')
+            return
         body += self.buildConstantVDecl(enuminfo, name, alias)
         self.appendSection('enum', body)
 

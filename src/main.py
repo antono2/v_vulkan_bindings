@@ -265,6 +265,9 @@ if __name__ == '__main__':
         plan = {
             'type_names': [name for name in reg.typedict if isinstance(name, str)],
             'commands': gen.command_plan,
+            'structs': gen.struct_plan,
+            'constants': gen.constant_plan,
+            'structure_types': gen.STRUCTURE_TYPES,
         }
         pathlib.Path(args.command_plan).write_text(json.dumps(plan), encoding='utf-8')
 
