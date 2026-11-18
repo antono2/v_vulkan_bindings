@@ -268,6 +268,7 @@ if __name__ == '__main__':
             'structs': gen.struct_plan,
             'constants': gen.constant_plan,
             'groups': gen.group_plan,
+            'callbacks': gen.callback_plan,
         }
         pathlib.Path(args.command_plan).write_text(json.dumps(plan), encoding='utf-8')
 

@@ -7,6 +7,7 @@ const command_marker = '// VULKAN_CORE_COMMAND_SLOT '
 const group_marker = '// VULKAN_CORE_GROUP_SLOT '
 const constant_marker = '// VULKAN_CORE_CONSTANT_SLOT '
 const struct_marker = '// VULKAN_CORE_STRUCT_SLOT '
+const callback_marker = '// VULKAN_CORE_CALLBACK_SLOT '
 
 const primitive_types = ['bool', 'string', 'i8', 'u8', 'i16', 'u16', 'int', 'i32', 'u32', 'i64',
 	'u64', 'i128', 'u128', 'rune', 'f32', 'f64', 'isize', 'usize', 'voidptr']
@@ -82,6 +83,7 @@ pub struct BindingPlan {
 	structs    []Aggregate
 	constants  []StandaloneConstant
 	groups     []EnumGroup
+	callbacks  []Callback
 }
 
 struct CommandEmitter {
@@ -254,6 +256,13 @@ pub fn emit_bindings(template string, plan BindingPlan) !string {
 		}
 		constants[constant.name] = constant
 	}
+	mut callbacks := map[string]Callback{}
+	for callback in plan.callbacks {
+		if callback.name in callbacks {
+			return error('duplicate Vulkan callback ${callback.name}')
+		}
+		callbacks[callback.name] = callback
+	}
 	lines := template.split('\n')
 	mut command_count := 0
 	mut struct_count := 0
@@ -284,6 +293,11 @@ pub fn emit_bindings(template string, plan BindingPlan) !string {
 			constant := constants[name] or { return error('unexpected constant slot "${line}"') }
 			output.write_string(emit_constant(constant)!)
 			constants.delete(name)
+		} else if line.starts_with(callback_marker) {
+			name := line[callback_marker.len..]
+			callback := callbacks[name] or { return error('unexpected callback slot "${line}"') }
+			output.write_string(emit_callback(callback, known))
+			callbacks.delete(name)
 		} else {
 			output.write_string(line)
 		}
@@ -300,6 +314,9 @@ pub fn emit_bindings(template string, plan BindingPlan) !string {
 	}
 	if constants.len != 0 || plan.constants.len == 0 {
 		return error('${constants.len} of ${plan.constants.len} Vulkan constants left in the plan')
+	}
+	if callbacks.len != 0 || plan.callbacks.len == 0 {
+		return error('${callbacks.len} of ${plan.callbacks.len} Vulkan callbacks left in the plan')
 	}
 	return output.str()
 }
