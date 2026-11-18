@@ -146,13 +146,13 @@ there when a generator change affects application users.
 
 ## Source navigation and snapshot versions
 
-[`src/main.py`](src/main.py) configures Khronos registry traversal for the
-core bindings. [`src/vgenerator.py`](src/vgenerator.py) emits the header
-and remaining type aliases, function-pointer typedefs, and defines.
-[`scripts/coregen/`](scripts/coregen/) emits imported aggregates, enum and
-flag groups, standalone constants, and commands. [`scripts/generate_video.vsh`](scripts/generate_video.vsh)
-reads the video registry and emits the Vulkan Video declarations. Upstream files in `vulkandocs/`
-retain their Khronos headers and are not maintained as local source.
+[`src/main.py`](src/main.py) configures Khronos registry traversal.
+[`src/vgenerator.py`](src/vgenerator.py) hands the selected features and
+registry declarations to [`scripts/coregen/`](scripts/coregen/). That module
+emits the core binding, including its header and platform guards.
+[`scripts/generate_video.vsh`](scripts/generate_video.vsh) reads the video
+registry and emits the Vulkan Video declarations. Upstream files in
+`vulkandocs/` retain their Khronos headers.
 
 `VERSION` selects the registry tag for the committed snapshots as well as the
 default setup command. The current snapshots use Vulkan-Docs `v1.4.365`

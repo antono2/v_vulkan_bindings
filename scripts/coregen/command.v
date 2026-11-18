@@ -3,14 +3,6 @@ module coregen
 
 import strings
 
-const command_marker = '// VULKAN_CORE_COMMAND_SLOT '
-const group_marker = '// VULKAN_CORE_GROUP_SLOT '
-const constant_marker = '// VULKAN_CORE_CONSTANT_SLOT '
-const struct_marker = '// VULKAN_CORE_STRUCT_SLOT '
-const callback_marker = '// VULKAN_CORE_CALLBACK_SLOT '
-const define_marker = '// VULKAN_CORE_DEFINE_SLOT '
-const type_marker = '// VULKAN_CORE_TYPE_SLOT '
-
 const primitive_types = ['bool', 'string', 'i8', 'u8', 'i16', 'u16', 'int', 'i32', 'u32', 'i64',
 	'u64', 'i128', 'u128', 'rune', 'f32', 'f64', 'isize', 'usize', 'voidptr']
 
@@ -89,6 +81,7 @@ pub struct BindingPlan {
 	defines     []RegistryDefine
 	types       []RegistryType
 	type_events []TypeEvent
+	features    []RegistryFeature
 }
 
 struct CommandEmitter {
@@ -234,124 +227,4 @@ fn (emitter CommandEmitter) emit(command Command) string {
 		'pub type PFN_${command.name} = fn(${pfn_parameters.join(', ')})${return_suffix}\n' +
 		'@[inline]\npub fn ${wrapper_name(command.name)}${v_params}${return_suffix} {\n' +
 		'    ${call_prefix}C.${command.name}${c_call}\n}'
-}
-
-// emit_bindings fills declaration slots without changing feature or platform scope.
-pub fn emit_bindings(template string, plan BindingPlan) !string {
-	mut output := strings.new_builder(template.len)
-	mut known := map[string]bool{}
-	for name in plan.type_names {
-		known[name] = true
-	}
-	mut types := resolve_types(plan, known)!
-	mut groups := map[string]EnumGroup{}
-	for group in plan.groups {
-		if group.name in groups {
-			return error('duplicate Vulkan enum ${group.name}')
-		}
-		groups[group.name] = group
-	}
-	structure_group := groups['StructureType'] or {
-		return error('registry did not emit StructureType')
-	}
-	structure_types := structure_type_lookup(structure_group.entries.filter(it.required
-		&& !it.protected).map(enum_field('StructureType', it.name)))
-	mut constants := map[string]StandaloneConstant{}
-	for constant in plan.constants {
-		if constant.name in constants {
-			return error('duplicate Vulkan constant ${constant.name}')
-		}
-		constants[constant.name] = constant
-	}
-	mut callbacks := map[string]Callback{}
-	for callback in plan.callbacks {
-		if callback.name in callbacks {
-			return error('duplicate Vulkan callback ${callback.name}')
-		}
-		callbacks[callback.name] = callback
-	}
-	mut defines := map[string]RegistryDefine{}
-	for decl in plan.defines {
-		if decl.name in defines {
-			return error('duplicate Vulkan define ${decl.name}')
-		}
-		defines[decl.name] = decl
-	}
-	lines := template.split('\n')
-	mut command_count := 0
-	mut struct_count := 0
-	for index, line in lines {
-		if line.starts_with(command_marker) {
-			if command_count >= plan.commands.len
-				|| line != command_marker + plan.commands[command_count].name {
-				return error('unexpected command slot "${line}"')
-			}
-			command := plan.commands[command_count]
-			emitter := CommandEmitter{known, types.value_at}
-			output.write_string(emitter.emit(command))
-			command_count++
-		} else if line.starts_with(struct_marker) {
-			if struct_count >= plan.structs.len
-				|| line != struct_marker + plan.structs[struct_count].name {
-				return error('unexpected struct slot "${line}"')
-			}
-			aggregate := plan.structs[struct_count]
-			output.write_string(emit_aggregate(aggregate, known, structure_types,
-				types.aliases[remove_prefix(aggregate.name)])!)
-			struct_count++
-		} else if line.starts_with(group_marker) {
-			name := line[group_marker.len..]
-			group := groups[name] or { return error('unexpected enum slot "${line}"') }
-			output.write_string(emit_group(group, types.aliases[name])!)
-			groups.delete(name)
-		} else if line.starts_with(constant_marker) {
-			name := line[constant_marker.len..]
-			constant := constants[name] or { return error('unexpected constant slot "${line}"') }
-			output.write_string(emit_constant(constant)!)
-			constants.delete(name)
-		} else if line.starts_with(callback_marker) {
-			name := line[callback_marker.len..]
-			callback := callbacks[name] or { return error('unexpected callback slot "${line}"') }
-			output.write_string(emit_callback(callback, known, types.value_at))
-			callbacks.delete(name)
-		} else if line.starts_with(define_marker) {
-			name := line[define_marker.len..]
-			decl := defines[name] or { return error('unexpected define slot "${line}"') }
-			output.write_string(emit_define(decl)!)
-			defines.delete(name)
-		} else if line.starts_with(type_marker) {
-			name := line[type_marker.len..]
-			decl := types.type_slots[name] or { return error('unexpected type slot "${line}"') }
-			types.type_slots.delete(name)
-			if decl == '' {
-				continue
-			}
-			output.write_string(decl)
-		} else {
-			output.write_string(line)
-		}
-		if index + 1 < lines.len {
-			output.write_u8(`\n`)
-		}
-	}
-	if command_count != plan.commands.len || command_count == 0 || struct_count != plan.structs.len
-		|| struct_count == 0 {
-		return error('Vulkan plan emitted ${command_count}/${plan.commands.len} commands and ${struct_count}/${plan.structs.len} aggregates')
-	}
-	if groups.len != 0 {
-		return error('${groups.len} of ${plan.groups.len} Vulkan enums left in the plan')
-	}
-	if constants.len != 0 || plan.constants.len == 0 {
-		return error('${constants.len} of ${plan.constants.len} Vulkan constants left in the plan')
-	}
-	if callbacks.len != 0 || plan.callbacks.len == 0 {
-		return error('${callbacks.len} of ${plan.callbacks.len} Vulkan callbacks left in the plan')
-	}
-	if defines.len != 0 || plan.defines.len == 0 {
-		return error('${defines.len} of ${plan.defines.len} Vulkan defines left in the plan')
-	}
-	if types.type_slots.len != 0 || plan.types.len == 0 {
-		return error('${types.type_slots.len} of ${plan.types.len} Vulkan types left in the plan')
-	}
-	return output.str()
 }

@@ -272,6 +272,7 @@ if __name__ == '__main__':
             'defines': gen.define_plan,
             'types': gen.type_plan,
             'type_events': gen.type_events,
+            'features': gen.feature_plan,
         }
         pathlib.Path(args.command_plan).write_text(json.dumps(plan), encoding='utf-8')
 
