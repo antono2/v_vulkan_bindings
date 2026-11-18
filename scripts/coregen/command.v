@@ -3,7 +3,9 @@ module coregen
 
 import strings
 
-const marker = '// VULKAN_CORE_COMMAND_SLOT '
+const command_marker = '// VULKAN_CORE_COMMAND_SLOT '
+const constant_marker = '// VULKAN_CORE_CONSTANT_SLOT '
+const struct_marker = '// VULKAN_CORE_STRUCT_SLOT '
 
 const primitive_types = ['bool', 'string', 'i8', 'u8', 'i16', 'u16', 'int', 'i32', 'u32', 'i64',
 	'u64', 'i128', 'u128', 'rune', 'f32', 'f64', 'isize', 'usize', 'voidptr']
@@ -72,10 +74,13 @@ struct Command {
 	value_types []string
 }
 
-// CommandPlan preserves the order and type availability from feature traversal.
-pub struct CommandPlan {
-	type_names []string
-	commands   []Command
+// BindingPlan preserves the order and type availability from feature traversal.
+pub struct BindingPlan {
+	type_names      []string
+	commands        []Command
+	structs         []Aggregate
+	constants       []StandaloneConstant
+	structure_types []string
 }
 
 struct CommandEmitter {
@@ -222,24 +227,46 @@ fn (emitter CommandEmitter) emit(command Command) string {
 		'    ${call_prefix}C.${command.name}${c_call}\n}'
 }
 
-// emit_commands replaces feature traversal slots while keeping their platform and extension scope.
-pub fn emit_commands(template string, plan CommandPlan) !string {
+// emit_bindings fills declaration slots without changing feature or platform scope.
+pub fn emit_bindings(template string, plan BindingPlan) !string {
 	mut output := strings.new_builder(template.len)
 	mut known := map[string]bool{}
 	for name in plan.type_names {
 		known[name] = true
 	}
+	structure_types := structure_type_lookup(plan.structure_types)
+	mut constants := map[string]StandaloneConstant{}
+	for constant in plan.constants {
+		if constant.name in constants {
+			return error('duplicate Vulkan constant ${constant.name}')
+		}
+		constants[constant.name] = constant
+	}
 	lines := template.split('\n')
-	mut count := 0
+	mut command_count := 0
+	mut struct_count := 0
 	for index, line in lines {
-		if line.starts_with(marker) {
-			if count >= plan.commands.len || line != marker + plan.commands[count].name {
+		if line.starts_with(command_marker) {
+			if command_count >= plan.commands.len
+				|| line != command_marker + plan.commands[command_count].name {
 				return error('unexpected command slot "${line}"')
 			}
-			command := plan.commands[count]
+			command := plan.commands[command_count]
 			emitter := CommandEmitter{known, command.value_types}
 			output.write_string(emitter.emit(command))
-			count++
+			command_count++
+		} else if line.starts_with(struct_marker) {
+			if struct_count >= plan.structs.len
+				|| line != struct_marker + plan.structs[struct_count].name {
+				return error('unexpected struct slot "${line}"')
+			}
+			output.write_string(emit_aggregate(plan.structs[struct_count], known, structure_types)!)
+			struct_count++
+		} else if line.starts_with(constant_marker) {
+			name := line[constant_marker.len..]
+			constant := constants[name] or { return error('unexpected constant slot "${line}"') }
+			output.write_string(emit_constant(constant)!)
+			constants.delete(name)
 		} else {
 			output.write_string(line)
 		}
@@ -247,8 +274,12 @@ pub fn emit_commands(template string, plan CommandPlan) !string {
 			output.write_u8(`\n`)
 		}
 	}
-	if count != plan.commands.len || count == 0 {
-		return error('expected ${plan.commands.len} Vulkan commands, emitted ${count}')
+	if command_count != plan.commands.len || command_count == 0 || struct_count != plan.structs.len
+		|| struct_count == 0 {
+		return error('Vulkan plan emitted ${command_count}/${plan.commands.len} commands and ${struct_count}/${plan.structs.len} aggregates')
+	}
+	if constants.len != 0 || plan.constants.len == 0 {
+		return error('${constants.len} of ${plan.constants.len} Vulkan constants left in the plan')
 	}
 	return output.str()
 }
