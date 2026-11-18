@@ -4,6 +4,7 @@ module coregen
 import strings
 
 const command_marker = '// VULKAN_CORE_COMMAND_SLOT '
+const group_marker = '// VULKAN_CORE_GROUP_SLOT '
 const constant_marker = '// VULKAN_CORE_CONSTANT_SLOT '
 const struct_marker = '// VULKAN_CORE_STRUCT_SLOT '
 
@@ -76,11 +77,11 @@ struct Command {
 
 // BindingPlan preserves the order and type availability from feature traversal.
 pub struct BindingPlan {
-	type_names      []string
-	commands        []Command
-	structs         []Aggregate
-	constants       []StandaloneConstant
-	structure_types []string
+	type_names []string
+	commands   []Command
+	structs    []Aggregate
+	constants  []StandaloneConstant
+	groups     []EnumGroup
 }
 
 struct CommandEmitter {
@@ -234,7 +235,18 @@ pub fn emit_bindings(template string, plan BindingPlan) !string {
 	for name in plan.type_names {
 		known[name] = true
 	}
-	structure_types := structure_type_lookup(plan.structure_types)
+	mut groups := map[string]EnumGroup{}
+	for group in plan.groups {
+		if group.name in groups {
+			return error('duplicate Vulkan enum ${group.name}')
+		}
+		groups[group.name] = group
+	}
+	structure_group := groups['StructureType'] or {
+		return error('registry did not emit StructureType')
+	}
+	structure_types := structure_type_lookup(structure_group.entries.filter(it.required
+		&& !it.protected).map(enum_field('StructureType', it.name)))
 	mut constants := map[string]StandaloneConstant{}
 	for constant in plan.constants {
 		if constant.name in constants {
@@ -262,6 +274,11 @@ pub fn emit_bindings(template string, plan BindingPlan) !string {
 			}
 			output.write_string(emit_aggregate(plan.structs[struct_count], known, structure_types)!)
 			struct_count++
+		} else if line.starts_with(group_marker) {
+			name := line[group_marker.len..]
+			group := groups[name] or { return error('unexpected enum slot "${line}"') }
+			output.write_string(emit_group(group)!)
+			groups.delete(name)
 		} else if line.starts_with(constant_marker) {
 			name := line[constant_marker.len..]
 			constant := constants[name] or { return error('unexpected constant slot "${line}"') }
@@ -277,6 +294,9 @@ pub fn emit_bindings(template string, plan BindingPlan) !string {
 	if command_count != plan.commands.len || command_count == 0 || struct_count != plan.structs.len
 		|| struct_count == 0 {
 		return error('Vulkan plan emitted ${command_count}/${plan.commands.len} commands and ${struct_count}/${plan.structs.len} aggregates')
+	}
+	if groups.len != 0 {
+		return error('${groups.len} of ${plan.groups.len} Vulkan enums left in the plan')
 	}
 	if constants.len != 0 || plan.constants.len == 0 {
 		return error('${constants.len} of ${plan.constants.len} Vulkan constants left in the plan')

@@ -5,7 +5,7 @@ import strings
 
 struct StandaloneConstant {
 	name   string
-	value  string
+	value  RegistryValue
 	c_type string
 }
 
@@ -107,10 +107,11 @@ fn strip_wrapping_parentheses(expression string) string {
 
 fn emit_constant(constant StandaloneConstant) !string {
 	name := remove_prefix(constant.name.trim_space().to_lower())
-	if name == '' || constant.value == '' {
+	if name == '' {
 		return error('incomplete Vulkan constant "${constant.name}"')
 	}
-	original := strip_wrapping_parentheses(constant.value)
+	original :=
+		strip_wrapping_parentheses(resolve_value(constant.value, 32, false, false)!.spelling)
 	if name.ends_with('_extension_name') && original.starts_with('"') {
 		return 'pub const ${name} = c${original}'
 	}
