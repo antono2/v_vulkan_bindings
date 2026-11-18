@@ -38,9 +38,9 @@ fn generate(args []string) ! {
 	if result.exit_code != 0 {
 		return error('Vulkan registry traversal failed\n${result.output}')
 	}
-	template := os.read_file(source_path)!.replace('\r\n', '\n')
 	plan := json2.decode[coregen.BindingPlan](os.read_file(plan_path)!)!
-	source := coregen.emit_bindings(template, plan)!
+	license := os.read_file(os.join_path(root, 'LICENSE'))!.replace('\r\n', '\n')
+	source := coregen.emit_bindings(plan, license)!
 	os.write_file(output, source)!
 }
 

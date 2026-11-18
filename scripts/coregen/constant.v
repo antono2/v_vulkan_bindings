@@ -4,9 +4,10 @@ module coregen
 import strings
 
 struct StandaloneConstant {
-	name   string
-	value  RegistryValue
-	c_type string
+	name       string
+	value      RegistryValue
+	c_type     string
+	deprecated string
 }
 
 fn identifier_byte(ch u8) bool {

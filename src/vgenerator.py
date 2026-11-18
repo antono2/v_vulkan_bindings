@@ -346,12 +346,15 @@ class VOutputGenerator(OutputGenerator):
         self.define_plan = []
         self.type_plan = []
         self.type_events = []
+        self.feature_plan = []
         self.may_alias = None
         self.fixed_array_aliases = []
         self.emitted_platform_flags = set()
 
     def beginFile(self, genOpts):
         OutputGenerator.beginFile(self, genOpts)
+        if self.command_plan is not None:
+            return
         if self.genOpts is None:
             raise MissingGeneratorOptionsError()
         # V module
@@ -449,6 +452,17 @@ fn C.volkLoadDevice(Device)''', file=self.outFile)
     # Conditional compilation guard is placed around multiple functions.
     def endFeature(self):
         "Actually write the interface to the output file."
+        if self.command_plan is not None:
+            if self.emit and self.feature_not_empty:
+                self.feature_plan.append({
+                    'name': self.featureName,
+                    'platform': self.feature_platform_flag or '',
+                    'platform_define': self.feature_platform_protect or '',
+                    'protect': self.featureExtraProtect or '',
+                    'sections': {key: value for key, value in self.sections.items() if value},
+                })
+            OutputGenerator.endFeature(self)
+            return
         if self.emit:
             if self.feature_not_empty:
                 if self.genOpts is None:
@@ -481,9 +495,6 @@ fn C.volkLoadDevice(Device)''', file=self.outFile)
                         constant_prefix = f'pub const {self.featureName}_'
                         for entry in self.sections['enum']:
                             stripped = entry.strip()
-                            marker = '// VULKAN_CORE_CONSTANT_SLOT '
-                            if stripped.startswith(marker):
-                                stripped = 'pub const ' + self.removeVk(stripped[len(marker):].lower())
                             if stripped.startswith(constant_prefix) and (
                                 stripped.startswith(constant_prefix + 'spec_version') or
                                 stripped.startswith(constant_prefix + 'extension_name')
@@ -554,6 +565,9 @@ fn C.volkLoadDevice(Device)''', file=self.outFile)
 
         self.sections[section].append(text)
         self.feature_not_empty = True
+
+    def append_slot(self, section, kind, name):
+        self.appendSection(section, {'kind': kind, 'name': name})
 
     def genCType(self, typeinfo, name, alias):
         "Generate type."
@@ -901,7 +915,7 @@ fn C.volkLoadDevice(Device)''', file=self.outFile)
         typeName = self.removeVk(typeName)
         if self.command_plan is not None:
             self.recordStruct(typeElem, typeNameOrig, alias, protect)
-            self.appendSection('struct', f'// VULKAN_CORE_STRUCT_SLOT {typeNameOrig}\n')
+            self.append_slot('struct', 'aggregate', typeNameOrig)
             return
 
         body = self.deprecationComment(typeElem)
@@ -1007,8 +1021,7 @@ fn C.volkLoadDevice(Device)''', file=self.outFile)
         groupName = self.removeVk(groupName)
         if self.command_plan is not None:
             self.recordGroup(groupElem, groupName, alias)
-            marker = f'// VULKAN_CORE_GROUP_SLOT {groupName}'
-            self.appendSection(section, marker + '\n' if alias else '\n' + marker)
+            self.append_slot(section, 'group', groupName)
             return
         if alias:
             groupName,  alias = self.v_translate_c_name_to_basetype(groupName, alias)
@@ -1070,14 +1083,15 @@ fn C.volkLoadDevice(Device)''', file=self.outFile)
            pass
 
         OutputGenerator.genEnum(self, enuminfo, name, alias)
-        body = self.deprecationComment(enuminfo.elem)
         if self.command_plan is not None:
             self.constant_plan.append({
                 'name': name, 'value': self.registryValue(enuminfo.elem),
                 'c_type': '' if alias else enuminfo.elem.get('type', ''),
+                'deprecated': enuminfo.elem.get('deprecated', ''),
             })
-            self.appendSection('enum', body + f'// VULKAN_CORE_CONSTANT_SLOT {name}')
+            self.append_slot('enum', 'constant', name)
             return
+        body = self.deprecationComment(enuminfo.elem)
         body += self.buildConstantVDecl(enuminfo, name, alias)
         self.appendSection('enum', body)
 
@@ -1267,7 +1281,7 @@ fn C.volkLoadDevice(Device)''', file=self.outFile)
             'parameters': params,
             'type_order': len(self.type_events),
         })
-        self.appendSection('struct', f'// VULKAN_CORE_CALLBACK_SLOT {callback_name}')
+        self.append_slot('struct', 'callback', callback_name)
 
     def build_legacy_funcpointer_type_decl(self, typeElem, name):
         """Read the flat funcpointer representation used by older registries."""
@@ -1306,7 +1320,7 @@ fn C.volkLoadDevice(Device)''', file=self.outFile)
             raise MissingGeneratorOptionsError()
         if self.command_plan is not None:
             self.recordCommand(cmdinfo.elem, name)
-            self.appendSection('command', f'// VULKAN_CORE_COMMAND_SLOT {name}\n')
+            self.append_slot('command', 'command', name)
             return
         prefix = ''
         decls = self.makeVDecls(cmdinfo.elem)
@@ -2263,7 +2277,7 @@ fn C.volkLoadDevice(Device)''', file=self.outFile)
             return
         if self.command_plan is not None and category == 'define':
             self.define_plan.append({'name': name, 'text': ''.join(typeElem.itertext())})
-            self.appendSection('define', f'// VULKAN_CORE_DEFINE_SLOT {name}')
+            self.append_slot('define', 'define', name)
             return
         if self.command_plan is not None and category not in ('struct', 'union'):
             c_type = typeElem.find('type')
@@ -2276,7 +2290,7 @@ fn C.volkLoadDevice(Device)''', file=self.outFile)
                 'suffix': noneStr(c_type.tail) if c_type is not None else '',
                 'deprecated': typeElem.get('deprecated', ''),
             })
-            self.appendSection(category or 'struct', f'// VULKAN_CORE_TYPE_SLOT {name}')
+            self.append_slot(category or 'struct', 'type', name)
             return
 
         # Normalize API version-style defines early so they do not fall through
