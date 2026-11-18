@@ -341,6 +341,7 @@ class VOutputGenerator(OutputGenerator):
         self.command_plan = None
         self.struct_plan = []
         self.constant_plan = []
+        self.group_plan = []
         self.may_alias = None
         self.fixed_array_aliases = []
         self.emitted_platform_flags = set()
@@ -1001,6 +1002,11 @@ fn C.volkLoadDevice(Device)''', file=self.outFile)
             section = 'group'
 
         groupName = self.removeVk(groupName)
+        if self.command_plan is not None:
+            self.recordGroup(groupElem, groupName, alias)
+            marker = f'// VULKAN_CORE_GROUP_SLOT {groupName}'
+            self.appendSection(section, marker + '\n' if alias else '\n' + marker)
+            return
         if alias:
             groupName,  alias = self.v_translate_c_name_to_basetype(groupName, alias)
             body = 'pub type ' + groupName + ' = ' + alias + '\n'
@@ -1014,6 +1020,45 @@ fn C.volkLoadDevice(Device)''', file=self.outFile)
             # NOTE: set keep_vk_member_name to True to keep vk enum member names like VK_DYNAMIC_STATE_PATCH_CONTROL_POINTS_EXT
             (section, body) = self.buildEnumVDecl(self.genOpts.genEnumBeginEndRange, groupinfo, groupName, keep_vk_member_name=False)
             self.appendSection(section, '\n' + body)
+
+    @staticmethod
+    def registryValue(element):
+        """Capture the registry's literal, bit, offset, or alias attributes."""
+        return {
+            'literal': element.get('value', ''),
+            'bit_position': element.get('bitpos', ''),
+            'extension_number': element.get('extnumber', ''),
+            'offset': element.get('offset', ''),
+            'negative': 'dir' in element.attrib,
+            'alias': element.get('alias', ''),
+        }
+
+    def recordGroup(self, element, name, alias):
+        """Pass selected enumerants and resolved ABI values to the V emitter."""
+        if alias:
+            _, target = self.v_translate_c_name_to_basetype(name, alias)
+            if target in self.ENUM_TYPES:
+                self.ENUM_TYPES.append(name)
+            self.group_plan.append({'name': name, 'alias': target})
+            return
+
+        bitwidth = int(element.get('bitwidth') or '32')
+        wide = element.get('type') == 'bitmask' and bitwidth > 32
+        if wide:
+            self.ALIAS_TO_BASE_TYPE_MAP[name] = 'u64' if bitwidth == 64 else 'u32'
+        else:
+            self.ENUM_TYPES.append(name)
+        entries = []
+        for entry in self.checkDuplicateEnums(element.findall('enum')):
+            entries.append({
+                'name': entry.get('name'),
+                'value': self.registryValue(entry),
+                'deprecated': entry.get('deprecated', ''),
+                'protected': 'protect' in entry.attrib,
+                'extended': 'extends' in entry.attrib,
+                'required': self.isEnumRequired(entry),
+            })
+        self.group_plan.append({'name': name, 'wide': wide, 'bitwidth': bitwidth, 'entries': entries})
 
     def genEnum(self, enuminfo, name, alias, protect=None):
         """Generate the C declaration for a constant (a single <enum> value).
@@ -1030,9 +1075,8 @@ fn C.volkLoadDevice(Device)''', file=self.outFile)
         OutputGenerator.genEnum(self, enuminfo, name, alias)
         body = self.deprecationComment(enuminfo.elem)
         if self.command_plan is not None:
-            _, value = self.enumToValue(enuminfo.elem, False)
             self.constant_plan.append({
-                'name': name, 'value': value,
+                'name': name, 'value': self.registryValue(enuminfo.elem),
                 'c_type': '' if alias else enuminfo.elem.get('type', ''),
             })
             self.appendSection('enum', body + f'// VULKAN_CORE_CONSTANT_SLOT {name}')
