@@ -27,7 +27,7 @@ jobs:
       - name: Reproduce the committed API and its introductions
         run: |
           set -euo pipefail
-          ./scripts/generate.sh
+          v run scripts/generate.vsh
           git diff --exit-code -- src/vulkan.v src/vulkan_video.v
 
   registry-generator-compat:
@@ -220,7 +220,7 @@ jobs:
         run: |
           set -euo pipefail
           echo "Compiler: $(v version)"
-          ./scripts/generate.sh "$VERSION"
+          v run scripts/generate.vsh "$VERSION"
           install -m 0644 src/vulkan.v published/vulkan.v
           install -m 0644 src/vulkan_video.v published/vulkan_video.v
           printf '%s\n' "$VERSION" > published/VERSION
