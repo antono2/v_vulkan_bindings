@@ -15,7 +15,7 @@ mut:
 	actions []string
 }
 
-fn execute(executable string, args []string) !string {
+fn run_command(executable string, args []string) !string {
 	result := os.execute(os.quoted_path(executable) + ' ' + args.map(os.quoted_path(it)).join(' '))
 	if result.exit_code != 0 {
 		return error('${executable} failed (${result.exit_code}): ${result.output.trim_space()}')
@@ -102,7 +102,7 @@ fn run_cli() ! {
 		repo:    os.getenv('DEPLOY_TARGET_REPO')
 		branch:  os.getenv('BRANCH_NAME')
 		version: os.getenv('RELEASE_VERSION')
-	}, execute)!
+	}, run_command)!
 }
 
 run_cli() or {
