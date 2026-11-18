@@ -27,7 +27,7 @@ Python dependency and regenerates both binding files:
 ```bash
 git clone https://github.com/antono2/v_vulkan_bindings.git
 cd v_vulkan_bindings
-./scripts/generate.sh
+v run scripts/generate.vsh
 ```
 
 On Windows, run the equivalent PowerShell script:
@@ -42,7 +42,7 @@ Pass a Vulkan-Docs tag to generate a different registry release. For example,
 this explicitly selects the historical `v1.4.362` snapshot:
 
 ```bash
-./scripts/generate.sh v1.4.362
+v run scripts/generate.vsh v1.4.362
 ```
 
 ```powershell
@@ -145,7 +145,7 @@ Use V 0.5.2 for the committed formatting, regenerate with the default setup
 command and check for drift before submitting changes:
 
 ```sh
-./scripts/generate.sh
+v run scripts/generate.vsh
 git diff --exit-code -- src/vulkan.v src/vulkan_video.v
 ```
 
