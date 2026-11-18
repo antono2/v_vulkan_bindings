@@ -90,7 +90,7 @@ v fmt -w src/vulkan_video.v
 
 Prepare the pinned Vulkan-Docs checkout and Python environment with
 `v run scripts/generate.vsh`. The core generator uses Python helpers from
-that checkout for registry traversal. V resolves enum offsets and flag values
+that checkout for registry traversal. V resolves typedefs, enum offsets and flag values
 and emits enums, constants, version helpers, C-backed structs and unions,
 callbacks, and commands.
 

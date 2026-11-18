@@ -344,6 +344,8 @@ class VOutputGenerator(OutputGenerator):
         self.group_plan = []
         self.callback_plan = []
         self.define_plan = []
+        self.type_plan = []
+        self.type_events = []
         self.may_alias = None
         self.fixed_array_aliases = []
         self.emitted_platform_flags = set()
@@ -898,7 +900,7 @@ fn C.volkLoadDevice(Device)''', file=self.outFile)
         typeNameOrig = typeName
         typeName = self.removeVk(typeName)
         if self.command_plan is not None:
-            self.recordStruct(typeElem, typeNameOrig, typeName, alias, protect)
+            self.recordStruct(typeElem, typeNameOrig, alias, protect)
             self.appendSection('struct', f'// VULKAN_CORE_STRUCT_SLOT {typeNameOrig}\n')
             return
 
@@ -951,14 +953,13 @@ fn C.volkLoadDevice(Device)''', file=self.outFile)
 
         self.appendSection('struct', body)
 
-    def recordStruct(self, element, c_name, name, alias, protect):
+    def recordStruct(self, element, c_name, alias, protect):
         """Pass C aggregates and the registry's guard context to the V emitter."""
+        self.type_events.append({'kind': 'aggregate', 'index': len(self.struct_plan)})
         if alias:
-            _, target = self.v_translate_c_name_to_basetype(name, alias)
-            self.struct_plan.append({'name': c_name, 'alias': target})
+            self.struct_plan.append({'name': c_name, 'alias': alias})
             return
 
-        self.ALIAS_TO_BASE_TYPE_MAP.setdefault(name, 'C.' + c_name)
         protect_begin, protect_end = self.genProtectString(element.get('protect') or protect)
         members = []
         for member in element.findall('.//member'):
@@ -1036,20 +1037,14 @@ fn C.volkLoadDevice(Device)''', file=self.outFile)
         }
 
     def recordGroup(self, element, name, alias):
-        """Pass selected enumerants and resolved ABI values to the V emitter."""
+        """Pass selected registry enumerants and aliases to the V emitter."""
+        self.type_events.append({'kind': 'group', 'index': len(self.group_plan)})
         if alias:
-            _, target = self.v_translate_c_name_to_basetype(name, alias)
-            if target in self.ENUM_TYPES:
-                self.ENUM_TYPES.append(name)
-            self.group_plan.append({'name': name, 'alias': target})
+            self.group_plan.append({'name': name, 'alias': alias})
             return
 
         bitwidth = int(element.get('bitwidth') or '32')
         wide = element.get('type') == 'bitmask' and bitwidth > 32
-        if wide:
-            self.ALIAS_TO_BASE_TYPE_MAP[name] = 'u64' if bitwidth == 64 else 'u32'
-        else:
-            self.ENUM_TYPES.append(name)
         entries = []
         for entry in self.checkDuplicateEnums(element.findall('enum')):
             entries.append({
@@ -1270,7 +1265,7 @@ fn C.volkLoadDevice(Device)''', file=self.outFile)
             'suffix': suffix,
             'legacy': legacy,
             'parameters': params,
-            'value_types': self.current_value_types(),
+            'type_order': len(self.type_events),
         })
         self.appendSection('struct', f'// VULKAN_CORE_CALLBACK_SLOT {callback_name}')
 
@@ -1344,13 +1339,7 @@ fn C.volkLoadDevice(Device)''', file=self.outFile)
             'name': name,
             'return_type': command.findtext('proto/type'),
             'parameters': params,
-            'value_types': self.current_value_types(),
-        })
-
-    def current_value_types(self):
-        return sorted(set(self.ENUM_TYPES) | {
-            alias for alias, base in self.ALIAS_TO_BASE_TYPE_MAP.items()
-            if base in self.BASE_TYPES_ARR
+            'type_order': len(self.type_events),
         })
 
     def misracstyle(self):
@@ -2275,6 +2264,19 @@ fn C.volkLoadDevice(Device)''', file=self.outFile)
         if self.command_plan is not None and category == 'define':
             self.define_plan.append({'name': name, 'text': ''.join(typeElem.itertext())})
             self.appendSection('define', f'// VULKAN_CORE_DEFINE_SLOT {name}')
+            return
+        if self.command_plan is not None and category not in ('struct', 'union'):
+            c_type = typeElem.find('type')
+            self.type_events.append({'kind': 'type', 'index': len(self.type_plan)})
+            self.type_plan.append({
+                'name': name,
+                'category': category or '',
+                'alias': alias or '',
+                'c_type': noneStr(c_type.text) if c_type is not None else '',
+                'suffix': noneStr(c_type.tail) if c_type is not None else '',
+                'deprecated': typeElem.get('deprecated', ''),
+            })
+            self.appendSection(category or 'struct', f'// VULKAN_CORE_TYPE_SLOT {name}')
             return
 
         # Normalize API version-style defines early so they do not fall through

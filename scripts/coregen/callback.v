@@ -7,7 +7,7 @@ struct Callback {
 	suffix      string
 	legacy      bool
 	parameters  []CallbackParameter
-	value_types []string
+	type_order  int
 }
 
 struct CallbackParameter {
@@ -18,7 +18,7 @@ struct CallbackParameter {
 	indirection bool
 }
 
-fn callback_type(c_type string, suffix string, known map[string]bool) string {
+fn typedef_c_type(c_type string, suffix string, known map[string]bool) string {
 	base := c_type.trim_space()
 	if base == 'void' {
 		return if suffix.contains('*') { 'voidptr' } else { '' }
@@ -52,7 +52,7 @@ fn legacy_callback_name(suffix string) string {
 	return if word == '' { name } else { word }
 }
 
-fn emit_callback(callback Callback, known map[string]bool) string {
+fn emit_callback(callback Callback, known map[string]bool, value_at map[string]int) string {
 	mut parameters := []string{cap: callback.parameters.len}
 	for parameter in callback.parameters {
 		mut name := if callback.legacy {
@@ -63,7 +63,7 @@ fn emit_callback(callback Callback, known map[string]bool) string {
 		if name == '' {
 			continue
 		}
-		c_type := callback_type(parameter.c_type, parameter.suffix, known)
+		c_type := typedef_c_type(parameter.c_type, parameter.suffix, known)
 		field_type := if c_type == '' { 'voidptr' } else { c_type }
 		if !callback.legacy {
 			if name == 'module' {
@@ -75,7 +75,8 @@ fn emit_callback(callback Callback, known map[string]bool) string {
 			if parameter.constant && !name.starts_with('const_') {
 				name = 'const_' + name
 			} else if !parameter.constant && parameter.indirection && base !in primitive_types
-				&& base !in callback.value_types && !name.starts_with('mut_') {
+				&& !is_visited_value(base, callback.type_order, value_at)
+				&& !name.starts_with('mut_') {
 				name = 'mut_' + name
 			}
 		}
@@ -86,7 +87,7 @@ fn emit_callback(callback Callback, known map[string]bool) string {
 	} else {
 		callback.return_type
 	}
-	return_type := callback_type(raw_return, callback.suffix, known)
+	return_type := typedef_c_type(raw_return, callback.suffix, known)
 	return_suffix := if return_type == '' { '' } else { ' ${return_type}' }
 	return 'pub type ${callback.name} = fn (${parameters.join(', ')})${return_suffix}\n'
 }
