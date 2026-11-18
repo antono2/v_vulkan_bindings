@@ -269,6 +269,7 @@ if __name__ == '__main__':
             'constants': gen.constant_plan,
             'groups': gen.group_plan,
             'callbacks': gen.callback_plan,
+            'defines': gen.define_plan,
         }
         pathlib.Path(args.command_plan).write_text(json.dumps(plan), encoding='utf-8')
 

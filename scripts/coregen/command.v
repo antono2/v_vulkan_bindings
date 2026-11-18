@@ -8,6 +8,7 @@ const group_marker = '// VULKAN_CORE_GROUP_SLOT '
 const constant_marker = '// VULKAN_CORE_CONSTANT_SLOT '
 const struct_marker = '// VULKAN_CORE_STRUCT_SLOT '
 const callback_marker = '// VULKAN_CORE_CALLBACK_SLOT '
+const define_marker = '// VULKAN_CORE_DEFINE_SLOT '
 
 const primitive_types = ['bool', 'string', 'i8', 'u8', 'i16', 'u16', 'int', 'i32', 'u32', 'i64',
 	'u64', 'i128', 'u128', 'rune', 'f32', 'f64', 'isize', 'usize', 'voidptr']
@@ -84,6 +85,7 @@ pub struct BindingPlan {
 	constants  []StandaloneConstant
 	groups     []EnumGroup
 	callbacks  []Callback
+	defines    []RegistryDefine
 }
 
 struct CommandEmitter {
@@ -263,6 +265,13 @@ pub fn emit_bindings(template string, plan BindingPlan) !string {
 		}
 		callbacks[callback.name] = callback
 	}
+	mut defines := map[string]RegistryDefine{}
+	for decl in plan.defines {
+		if decl.name in defines {
+			return error('duplicate Vulkan define ${decl.name}')
+		}
+		defines[decl.name] = decl
+	}
 	lines := template.split('\n')
 	mut command_count := 0
 	mut struct_count := 0
@@ -298,6 +307,11 @@ pub fn emit_bindings(template string, plan BindingPlan) !string {
 			callback := callbacks[name] or { return error('unexpected callback slot "${line}"') }
 			output.write_string(emit_callback(callback, known))
 			callbacks.delete(name)
+		} else if line.starts_with(define_marker) {
+			name := line[define_marker.len..]
+			decl := defines[name] or { return error('unexpected define slot "${line}"') }
+			output.write_string(emit_define(decl)!)
+			defines.delete(name)
 		} else {
 			output.write_string(line)
 		}
@@ -317,6 +331,9 @@ pub fn emit_bindings(template string, plan BindingPlan) !string {
 	}
 	if callbacks.len != 0 || plan.callbacks.len == 0 {
 		return error('${callbacks.len} of ${plan.callbacks.len} Vulkan callbacks left in the plan')
+	}
+	if defines.len != 0 || plan.defines.len == 0 {
+		return error('${defines.len} of ${plan.defines.len} Vulkan defines left in the plan')
 	}
 	return output.str()
 }

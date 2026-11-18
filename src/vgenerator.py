@@ -343,6 +343,7 @@ class VOutputGenerator(OutputGenerator):
         self.constant_plan = []
         self.group_plan = []
         self.callback_plan = []
+        self.define_plan = []
         self.may_alias = None
         self.fixed_array_aliases = []
         self.emitted_platform_flags = set()
@@ -2270,6 +2271,10 @@ fn C.volkLoadDevice(Device)''', file=self.outFile)
 
         if self.command_plan is not None and category == 'funcpointer':
             self.record_callback(typeElem, name)
+            return
+        if self.command_plan is not None and category == 'define':
+            self.define_plan.append({'name': name, 'text': ''.join(typeElem.itertext())})
+            self.appendSection('define', f'// VULKAN_CORE_DEFINE_SLOT {name}')
             return
 
         # Normalize API version-style defines early so they do not fall through
