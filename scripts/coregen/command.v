@@ -72,6 +72,7 @@ struct Command {
 
 // BindingPlan preserves the order and type availability from feature traversal.
 pub struct BindingPlan {
+mut:
 	type_names  []string
 	commands    []Command
 	structs     []Aggregate

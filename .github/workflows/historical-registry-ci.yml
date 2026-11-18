@@ -18,9 +18,6 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
-        with:
-          python-version: "3.x"
       - uses: prantlf/setup-v-action@92f20bea50d2c9931a28c96bb4997a3c7357baf0 # v4
         with:
           version: 0.5.2
@@ -47,19 +44,17 @@ jobs:
       - uses: prantlf/setup-v-action@92f20bea50d2c9931a28c96bb4997a3c7357baf0 # v4
         with:
           version: 0.5.2
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
-        with:
-          python-version: "3.x"
-          cache: pip
-          cache-dependency-path: .github/generator-requirements.txt
-      - run: python -m pip install --requirement .github/generator-requirements.txt
       - name: Generate and format both bindings
+        env:
+          VERSION: ${{ matrix.version }}
         run: |
           set -euo pipefail
-          v run scripts/generate_core.vsh --python python
+          v run scripts/generate_core.vsh
           v run scripts/generate_video.vsh
           v fmt -w src/vulkan.v src/vulkan_video.v
           v fmt -verify src/vulkan.v src/vulkan_video.v
+          expected=$(awk -v tag="$VERSION" '$2 == tag { print $1 }' test/core_registry_sha256.txt)
+          printf '%s  src/vulkan.v\n' "$expected" | sha256sum --check --strict
           git diff --check
       - name: Check out module support files for the opaque-pointer ABI probe
         if: matrix.version == 'v1.4.368'
@@ -90,16 +85,15 @@ jobs:
     runs-on: windows-2022
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
-        with:
-          python-version: "3.x"
-          cache: pip
-          cache-dependency-path: .github/generator-requirements.txt
       - uses: prantlf/setup-v-action@92f20bea50d2c9931a28c96bb4997a3c7357baf0 # v4
+        with:
+          version: 0.5.2
       - name: Generate pinned bindings with PowerShell
         shell: pwsh
         run: |
           ./scripts/generate.ps1
+          git diff --exit-code -- src/vulkan.v src/vulkan_video.v
+          if ($LASTEXITCODE -ne 0) { throw 'Generated bindings differ from the committed snapshot' }
           git diff --check
           if (-not (Test-Path -LiteralPath src/vulkan.v -PathType Leaf)) {
             throw 'Vulkan bindings were not generated'
@@ -140,11 +134,6 @@ jobs:
           ref: d6e7ac1b1bcc98aed734a6ecbfa8509f24606c74
           path: .ci-v-source/thirdparty/tcc
           fetch-depth: 1
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
-        with:
-          python-version: "3.x"
-          cache: pip
-          cache-dependency-path: .github/generator-requirements.txt
       - name: Build pinned V3 compiler
         run: |
           make -C .ci-v-source local=1
@@ -155,8 +144,7 @@ jobs:
       - name: Generate and type-check current bindings
         run: |
           set -euo pipefail
-          python -m pip install --requirement .github/generator-requirements.txt
-          v run scripts/generate_core.vsh --python python
+          v run scripts/generate_core.vsh
           v run scripts/generate_video.vsh
 
           grep -F 'pub const khr_xlib_surface_extension_name' src/vulkan.v
@@ -204,12 +192,8 @@ jobs:
           repository: antono2/vulkan
           path: published
       - uses: prantlf/setup-v-action@92f20bea50d2c9931a28c96bb4997a3c7357baf0 # v4
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
-          python-version: "3.x"
-          cache: pip
-          cache-dependency-path: .github/generator-requirements.txt
-      - run: python -m pip install --requirement .github/generator-requirements.txt
+          version: 0.5.2
       - uses: NcStudios/VulkanCI@1a5db3ebde578c503b1d7f8df007e42a7367224c # v1.2
         env:
           # VulkanCI uses github.action_ref as its release artifact tag.
@@ -223,6 +207,8 @@ jobs:
           set -euo pipefail
           echo "Compiler: $(v version)"
           v run scripts/generate.vsh "$VERSION"
+          expected=$(awk -v tag="$VERSION" '$2 == tag { print $1 }' test/core_registry_sha256.txt)
+          printf '%s  src/vulkan.v\n' "$expected" | sha256sum --check --strict
           install -m 0644 src/vulkan.v published/vulkan.v
           install -m 0644 src/vulkan_video.v published/vulkan_video.v
           printf '%s\n' "$VERSION" > published/VERSION

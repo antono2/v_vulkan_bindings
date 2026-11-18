@@ -11,19 +11,8 @@ This repository contains the generator and maintenance workflows.
 
 ## Quick start
 
-Full regeneration requires Git, V 0.5.2 or newer and Python 3 with the
-`venv` module. Vulkan Video can be regenerated separately using only V and
-a copy of `video.xml`. On Ubuntu or Debian, install the native
-prerequisites with:
-
-```bash
-sudo apt update
-sudo apt install -y git python3 python3-venv
-```
-
-The setup script creates an isolated Python environment, checks out the
-Vulkan-Docs tag recorded by this generator checkout in `VERSION`, installs the
-Python dependency and regenerates both binding files:
+Install Git and V 0.5.2 or newer. The setup script checks out the
+Vulkan-Docs tag recorded in `VERSION` and regenerates both binding files.
 
 ```bash
 git clone https://github.com/antono2/v_vulkan_bindings.git
@@ -88,11 +77,8 @@ v fmt -w src/vulkan_video.v
 
 ## Generate the core bindings on their own
 
-Prepare the pinned Vulkan-Docs checkout and Python environment with
-`v run scripts/generate.vsh`. The core generator uses Python helpers from
-that checkout for registry traversal. V resolves typedefs, enum offsets and flag values
-and emits enums, constants, version helpers, C-backed structs and unions,
-callbacks, and commands.
+Use the pinned Vulkan-Docs checkout or pass an existing `vk.xml`. The
+standalone generator needs V and the XML file.
 
 ```sh
 v run scripts/generate_core.vsh --registry /usr/share/vulkan/registry/vk.xml
@@ -103,7 +89,6 @@ v fmt -w src/vulkan.v
 | --- | --- | --- |
 | `--registry` | `vulkandocs/xml/vk.xml` | Read a different core registry. |
 | `--output` | `src/vulkan.v` | Write to a separate file for comparison. |
-| `--python` | The Python executable in `.venv` | Use another environment with the registry helpers installed. |
 
 Use the pinned checkout for reproducible releases. An installed SDK may ship
 a different registry revision.
@@ -146,10 +131,10 @@ there when a generator change affects application users.
 
 ## Source navigation and snapshot versions
 
-[`src/main.py`](src/main.py) configures Khronos registry traversal.
-[`src/vgenerator.py`](src/vgenerator.py) hands the selected features and
-registry declarations to [`scripts/coregen/`](scripts/coregen/). That module
-emits the core binding, including its header and platform guards.
+[`scripts/registryxml/`](scripts/registryxml/) reads the Khronos XML.
+[`scripts/coregen/`](scripts/coregen/) selects the Vulkan API features,
+resolves declaration dependencies, and emits the core binding and its
+platform guards.
 [`scripts/generate_video.vsh`](scripts/generate_video.vsh) reads the video
 registry and emits the Vulkan Video declarations. Upstream files in
 `vulkandocs/` retain their Khronos headers.
