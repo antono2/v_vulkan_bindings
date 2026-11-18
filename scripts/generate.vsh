@@ -56,7 +56,7 @@ fn generate(args []string) ! {
 	}
 	run([venv_python, '-m', 'pip', 'install', '--quiet', '--requirement',
 		'.github/generator-requirements.txt'])!
-	run([venv_python, 'src/main.py', '-registry', 'vulkandocs/xml/vk.xml', 'vulkan.v'])!
+	run([@VEXE, 'run', 'scripts/generate_core.vsh', '--python', venv_python])!
 	run([@VEXE, 'run', 'scripts/generate_video.vsh'])!
 	run([@VEXE, 'fmt', '-w', 'src/vulkan.v', 'src/vulkan_video.v'])!
 	println('Generated Vulkan bindings from Vulkan-Docs ${registry_ref}')
