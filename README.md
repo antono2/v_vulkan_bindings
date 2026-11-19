@@ -9,6 +9,15 @@ For application development, use the published
 [`antono2.vulkan` module](https://github.com/antono2/vulkan#install-and-setup).
 This repository contains the generator and maintenance workflows.
 
+## Run the generated bindings
+
+- The [presentation example](https://github.com/antono2/vulkan/tree/master/examples/presentation)
+  clears a window and recreates its swapchain on resize.
+- The [Vulkan Video player](https://github.com/antono2/v_vulkan_video) uses the
+  generated video bindings to decode and present H.264 MP4 files.
+
+![The Vulkan presentation example clears a blue window at two sizes](https://raw.githubusercontent.com/antono2/vulkan/master/examples/presentation/preview.gif)
+
 ## Quick start
 
 Install Git and V 0.5.2 or newer. The setup script checks out the
