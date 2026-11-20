@@ -120,6 +120,10 @@ The [V staging script](scripts/stage_generated_release.vsh) prepares the headers
 for the smoke test and installs the same artifact in the proposal checkout.
 The generator checkout's own `VERSION` remains a reproducible local generation
 default; the scheduled workflow selects the newest tag independently.
+The [V release driver](scripts/release_workflow.vsh) prepares the generated
+files and matching headers, runs the smoke build, and stages the proposal.
+Run `v run scripts/release_workflow.vsh self-test` to rehearse against a
+temporary Git remote.
 
 When the registry tag is already published but the generator itself needs a
 compatibility correction, run the workflow manually with `force_regenerate`.

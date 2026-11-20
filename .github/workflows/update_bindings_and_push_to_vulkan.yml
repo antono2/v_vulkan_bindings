@@ -38,12 +38,7 @@ jobs:
         with:
           version: 0.5.2
           install-dependencies: false
-      - run: |
-          v run scripts/publish_generated_branch.vsh --self-test
-          v run scripts/open_generated_proposal.vsh --self-test
-          v run scripts/select_registry_version.vsh --self-test
-          v run scripts/stage_generated_release.vsh --self-test
-          v run test/compatibility_workflow/check.vsh
+      - run: v run scripts/release_workflow.vsh self-test
 
   versions:
     needs: publisher-tests
@@ -90,13 +85,9 @@ jobs:
         with:
           version: 0.5.2
       - name: Generate bindings
-        run: |
-          set -euo pipefail
-          v run scripts/generate_core.vsh
-          v run scripts/generate_video.vsh
-          v fmt -w src/vulkan.v
-          v fmt -w src/vulkan_video.v
-          v run scripts/stage_generated_release.vsh prepare '${{ needs.versions.outputs.requested }}'
+        env:
+          RELEASE_VERSION: ${{ needs.versions.outputs.requested }}
+        run: v run scripts/release_workflow.vsh generate "$RELEASE_VERSION"
       - uses: NcStudios/VulkanCI@1a5db3ebde578c503b1d7f8df007e42a7367224c # v1.2
         env:
           # VulkanCI uses github.action_ref as its release artifact tag.
@@ -104,12 +95,7 @@ jobs:
         with:
           sdkVersion: 1.4.309.0
       - name: Compile against the matching bundled headers and Volk
-        run: |
-          set -euo pipefail
-          install -d "$HOME/.vmodules/antono2"
-          v run scripts/stage_generated_release.vsh install-check
-          ln -s "$GITHUB_WORKSPACE/published" "$HOME/.vmodules/antono2/vulkan"
-          v -cc gcc run test
+        run: v run scripts/release_workflow.vsh smoke
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: v-vulkan-bindings-${{ needs.versions.outputs.requested }}
@@ -148,14 +134,8 @@ jobs:
         id: publish
         env:
           BRANCH_NAME: ${{ needs.versions.outputs.branch }}
-        run: |
-          set -euo pipefail
-          v run updater/scripts/stage_generated_release.vsh install-proposal
-          git diff --check
-          git add vulkan.v vulkan_video.v VERSION REGISTRY_COMMIT \
-            c/vendor/include/vulkan c/vendor/include/vk_video
-          v run updater/scripts/publish_generated_branch.vsh \
-            "$BRANCH_NAME" "Generated bindings ${{ needs.versions.outputs.requested }}"
+          RELEASE_VERSION: ${{ needs.versions.outputs.requested }}
+        run: v run updater/scripts/release_workflow.vsh publish "$RELEASE_VERSION" "$BRANCH_NAME"
       - name: Open pull request if missing
         env:
           BRANCH_NAME: ${{ needs.versions.outputs.branch }}
