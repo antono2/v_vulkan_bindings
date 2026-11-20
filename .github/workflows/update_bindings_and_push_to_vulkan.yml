@@ -43,6 +43,7 @@ jobs:
           v run scripts/open_generated_proposal.vsh --self-test
           v run scripts/select_registry_version.vsh --self-test
           v run scripts/stage_generated_release.vsh --self-test
+          v run test/compatibility_workflow/check.vsh
 
   versions:
     needs: publisher-tests
