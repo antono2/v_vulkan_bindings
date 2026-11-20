@@ -5,7 +5,7 @@ import semver
 
 const header_root = 'c/vendor/include'
 const header_groups = ['vulkan', 'vk_video']
-const usage = 'Usage: stage_generated_release.vsh prepare TAG | install-check | install-proposal | --self-test'
+const usage = 'Usage: stage_generated_release.vsh prepare TAG | install-check | install-compat TAG | install-proposal | --self-test'
 
 struct Copy {
 	source string
@@ -96,13 +96,13 @@ fn validate_metadata(tag string, commit string) ! {
 	}
 }
 
-fn prepare(root string, tag string, commit string) ! {
+fn prepare(root string, metadata_root string, tag string, commit string) ! {
 	validate_metadata(tag, commit)!
 	plans := header_plans(os.join_path(root, 'vulkanheaders', 'include'), os.join_path(root,
 		'published', header_root))!
 	install_headers(plans)!
-	replace_file(os.join_path(root, 'VERSION'), (tag + '\n').bytes())!
-	replace_file(os.join_path(root, 'REGISTRY_COMMIT'), (commit + '\n').bytes())!
+	replace_file(os.join_path(metadata_root, 'VERSION'), (tag + '\n').bytes())!
+	replace_file(os.join_path(metadata_root, 'REGISTRY_COMMIT'), (commit + '\n').bytes())!
 }
 
 fn bindings(artifact string, target string) []Copy {
@@ -147,7 +147,7 @@ fn self_test() ! {
 		os.write_file(os.join_path(target, 'README'), 'keep')!
 	}
 	commit := '0123456789abcdef0123456789abcdef01234567'
-	prepare(artifact, 'v1.4.369', commit)!
+	prepare(artifact, artifact, 'v1.4.369', commit)!
 	copy_files(bindings(artifact, os.join_path(artifact, 'published')))!
 	assert os.read_file(os.join_path(artifact, 'published', 'vulkan_video.v'))! == '// video\n'
 	os.write_file(os.join_path(root, 'c', 'volk.c.v'), '// pinned Volk\n')!
@@ -189,8 +189,12 @@ fn run(args []string) ! {
 		copy_files(bindings(root, os.join_path(root, 'published')))!
 	} else if args == ['install-proposal'] {
 		install_proposal(root)!
-	} else if args.len == 2 && args[0] == 'prepare' {
-		prepare(root, args[1], revision(os.join_path(root, 'vulkanheaders'))!)!
+	} else if args.len == 2 && args[0] in ['prepare', 'install-compat'] {
+		metadata_root := if args[0] == 'prepare' { root } else { os.join_path(root, 'published') }
+		prepare(root, metadata_root, args[1], revision(os.join_path(root, 'vulkanheaders'))!)!
+		if args[0] == 'install-compat' {
+			copy_files(bindings(root, metadata_root))!
+		}
 	} else {
 		return error(usage)
 	}

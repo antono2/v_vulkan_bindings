@@ -128,7 +128,10 @@ using the release-only `generated/*` branch namespace.
 
 `publish-compatibility-tags.yml` is a manual maintenance workflow for old
 registry releases whose original generated layout is not accepted by current
-V. It publishes new `+vcompat.N` tags and never rewrites the historical tags.
+V. Its [V driver](scripts/publish_compatibility_tags.vsh) stages the exact
+registry headers, compiles each pending release with the bundled Volk, and
+pushes the new `+vcompat.N` tags atomically. Rehearse that path locally with
+`v run test/compatibility_workflow/check.vsh`, which creates a temporary Git remote.
 
 ## Documentation maintenance
 
