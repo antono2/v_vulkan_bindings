@@ -42,6 +42,7 @@ jobs:
           v run scripts/publish_generated_branch.vsh --self-test
           v run scripts/open_generated_proposal.vsh --self-test
           v run scripts/select_registry_version.vsh --self-test
+          v run scripts/stage_generated_release.vsh --self-test
 
   versions:
     needs: publisher-tests
@@ -94,16 +95,7 @@ jobs:
           v run scripts/generate_video.vsh
           v fmt -w src/vulkan.v
           v fmt -w src/vulkan_video.v
-          printf '%s\n' '${{ needs.versions.outputs.requested }}' > VERSION
-          git -C vulkanheaders rev-parse HEAD > REGISTRY_COMMIT
-          grep -Eq '^[0-9a-f]{40}$' REGISTRY_COMMIT
-          for directory in vulkan vk_video; do
-            target="published/c/vendor/include/$directory"
-            source="vulkanheaders/include/$directory"
-            install -d "$target"
-            find "$target" -maxdepth 1 -name '*.h' -delete
-            find "$source" -maxdepth 1 -name '*.h' -exec cp -t "$target" {} +
-          done
+          v run scripts/stage_generated_release.vsh prepare '${{ needs.versions.outputs.requested }}'
       - uses: NcStudios/VulkanCI@1a5db3ebde578c503b1d7f8df007e42a7367224c # v1.2
         env:
           # VulkanCI uses github.action_ref as its release artifact tag.
@@ -114,8 +106,7 @@ jobs:
         run: |
           set -euo pipefail
           install -d "$HOME/.vmodules/antono2"
-          install -m 0644 src/vulkan.v published/vulkan.v
-          install -m 0644 src/vulkan_video.v published/vulkan_video.v
+          v run scripts/stage_generated_release.vsh install-check
           ln -s "$GITHUB_WORKSPACE/published" "$HOME/.vmodules/antono2/vulkan"
           v -cc gcc run test
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
@@ -158,17 +149,7 @@ jobs:
           BRANCH_NAME: ${{ needs.versions.outputs.branch }}
         run: |
           set -euo pipefail
-          test -f c/volk.c.v
-          install -m 0644 generated/src/vulkan.v vulkan.v
-          install -m 0644 generated/src/vulkan_video.v vulkan_video.v
-          install -m 0644 generated/VERSION VERSION
-          install -m 0644 generated/REGISTRY_COMMIT REGISTRY_COMMIT
-          for directory in vulkan vk_video; do
-            target="c/vendor/include/$directory"
-            source="generated/published/c/vendor/include/$directory"
-            find "$target" -maxdepth 1 -name '*.h' -delete
-            cp "$source"/*.h "$target/"
-          done
+          v run updater/scripts/stage_generated_release.vsh install-proposal
           git diff --check
           git add vulkan.v vulkan_video.v VERSION REGISTRY_COMMIT \
             c/vendor/include/vulkan c/vendor/include/vk_video

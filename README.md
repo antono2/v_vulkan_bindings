@@ -116,6 +116,8 @@ validates the version and publishes the GitHub release.
 The proposal also copies the matching Vulkan and video C headers from the
 same Vulkan-Headers tag. The compile smoke test uses those bundled headers
 and the target module's pinned Volk sources. Registry downgrades are rejected.
+The [V staging script](scripts/stage_generated_release.vsh) prepares the headers
+for the smoke test and installs the same artifact in the proposal checkout.
 The generator checkout's own `VERSION` remains a reproducible local generation
 default; the scheduled workflow selects the newest tag independently.
 
