@@ -22,10 +22,7 @@ jobs:
         with:
           version: 0.5.2
       - name: Reproduce the committed API and its introductions
-        run: |
-          set -euo pipefail
-          v run scripts/generate.vsh
-          git diff --exit-code -- src/vulkan.v src/vulkan_video.v
+        run: v run scripts/check_historical_registry.vsh snapshot
 
   registry-generator-compat:
     name: Vulkan-Docs ${{ matrix.version }} generator interface
@@ -47,15 +44,7 @@ jobs:
       - name: Generate and format both bindings
         env:
           VERSION: ${{ matrix.version }}
-        run: |
-          set -euo pipefail
-          v run scripts/generate_core.vsh
-          v run scripts/generate_video.vsh
-          v fmt -w src/vulkan.v src/vulkan_video.v
-          v fmt -verify src/vulkan.v src/vulkan_video.v
-          expected=$(awk -v tag="$VERSION" '$2 == tag { print $1 }' test/core_registry_sha256.txt)
-          printf '%s  src/vulkan.v\n' "$expected" | sha256sum --check --strict
-          git diff --check
+        run: v run scripts/check_historical_registry.vsh registry "$VERSION"
       - name: Check out module support files for the opaque-pointer ABI probe
         if: matrix.version == 'v1.4.368'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -72,13 +61,8 @@ jobs:
       - name: Compile and run the generated opaque-pointer ABI probe
         if: matrix.version == 'v1.4.368'
         env:
-          VMODULES: ${{ github.workspace }}/abi-modules
           V_C_ERROR_BUG_REPORT_DISABLED: '1'
-        run: |
-          set -euo pipefail
-          cp src/vulkan.v src/vulkan_video.v abi-modules/antono2/vulkan/
-          cp -R abi-headers/include/. abi-modules/antono2/vulkan/c/vendor/include/
-          v -cc gcc run test/opaque_basetype
+        run: v run scripts/check_historical_registry.vsh abi
 
   windows-generator:
     name: Windows generator setup
@@ -90,17 +74,7 @@ jobs:
           version: 0.5.2
       - name: Generate pinned bindings with PowerShell
         shell: pwsh
-        run: |
-          ./scripts/generate.ps1
-          git diff --exit-code -- src/vulkan.v src/vulkan_video.v
-          if ($LASTEXITCODE -ne 0) { throw 'Generated bindings differ from the committed snapshot' }
-          git diff --check
-          if (-not (Test-Path -LiteralPath src/vulkan.v -PathType Leaf)) {
-            throw 'Vulkan bindings were not generated'
-          }
-          if (-not (Test-Path -LiteralPath src/vulkan_video.v -PathType Leaf)) {
-            throw 'Vulkan Video bindings were not generated'
-          }
+        run: v run scripts/check_historical_registry.vsh powershell
 
   strict-v3-frontend:
     name: Strict V3 frontend
@@ -135,43 +109,12 @@ jobs:
           path: .ci-v-source/thirdparty/tcc
           fetch-depth: 1
       - name: Build pinned V3 compiler
-        run: |
-          make -C .ci-v-source local=1
-          .ci-v-source/v version
+        run: make -C .ci-v-source local=1
       - uses: prantlf/setup-v-action@92f20bea50d2c9931a28c96bb4997a3c7357baf0 # v4
         with:
           version: 0.5.2
       - name: Generate and type-check current bindings
-        run: |
-          set -euo pipefail
-          v run scripts/generate_core.vsh
-          v run scripts/generate_video.vsh
-
-          grep -F 'pub const khr_xlib_surface_extension_name' src/vulkan.v
-          grep -F '$if vulkan_xlib ? {' src/vulkan.v
-          grep -F '#flag -DVK_USE_PLATFORM_XLIB_KHR' src/vulkan.v
-          grep -F '$if vulkan_win32 ? {' src/vulkan.v
-
-          grep -E '^pub type PFN_vkCmdSetFragmentShadingRateKHR = fn ?\(.*const_combinerOps &FragmentShadingRateCombinerOpKHR' \
-            src/vulkan.v
-          grep -E '^pub type PFN_vkCmdSetFragmentShadingRateEnumNV = fn ?\(.*const_combinerOps &FragmentShadingRateCombinerOpKHR' \
-            src/vulkan.v
-          grep -F 'pub type StdVideoH264ScalingListsScalingList4x4Array' \
-            src/vulkan_video.v
-          if grep -E '^[[:space:]]+[A-Z][A-Za-z0-9_]*[[:space:]]+\[' \
-            src/vulkan_video.v; then
-            echo 'PascalCase fixed-array fields must use named array aliases' >&2
-            exit 1
-          fi
-
-          install -m 0644 src/vulkan.v published/vulkan.v
-          install -m 0644 src/vulkan_video.v published/vulkan_video.v
-          install -d "$RUNNER_TEMP/vmodules/antono2"
-          ln -s "$GITHUB_WORKSPACE/published" \
-            "$RUNNER_TEMP/vmodules/antono2/vulkan"
-          VMODULES="$RUNNER_TEMP/vmodules" .ci-v-source/v -new-compiler -check test/main.c.v
-          VMODULES="$RUNNER_TEMP/vmodules" .ci-v-source/v -new-compiler -d vulkan_xlib \
-            -check test/main.c.v
+        run: v run scripts/check_historical_registry.vsh strict
 
   generate-and-compile:
     name: Vulkan-Docs ${{ matrix.version }}
@@ -203,43 +146,20 @@ jobs:
       - name: Generate and compile historical bindings
         env:
           VERSION: ${{ matrix.version }}
-        run: |
-          set -euo pipefail
-          echo "Compiler: $(v version)"
-          v run scripts/generate.vsh "$VERSION"
-          expected=$(awk -v tag="$VERSION" '$2 == tag { print $1 }' test/core_registry_sha256.txt)
-          printf '%s  src/vulkan.v\n' "$expected" | sha256sum --check --strict
-          install -m 0644 src/vulkan.v published/vulkan.v
-          install -m 0644 src/vulkan_video.v published/vulkan_video.v
-          printf '%s\n' "$VERSION" > published/VERSION
-          install -d "$VULKAN_SDK/include/volk" "$HOME/.vmodules/antono2"
-          curl --fail --silent --show-error --location \
-            https://raw.githubusercontent.com/zeux/volk/master/volk.h \
-            --output "$VULKAN_SDK/include/volk/volk.h"
-          curl --fail --silent --show-error --location \
-            https://raw.githubusercontent.com/zeux/volk/master/volk.c \
-            --output "$VULKAN_SDK/include/volk/volk.c"
-          ln -s "$GITHUB_WORKSPACE/published" "$HOME/.vmodules/antono2/vulkan"
-          v -cc gcc run test
-          if [[ "$VERSION" == v1.4.335 ]]; then
-            v -d vulkan_xlib -cc gcc run test
-          fi
+        run: v run scripts/check_historical_registry.vsh historical "$VERSION"
 
   required-checks:
     if: always()
     needs: [default-snapshot, registry-generator-compat, windows-generator, strict-v3-frontend, generate-and-compile]
     runs-on: ubuntu-24.04
     steps:
-      - name: Verify historical registry matrix
-        env:
-          SNAPSHOT_RESULT: ${{ needs.default-snapshot.result }}
-          REGISTRY_RESULT: ${{ needs.registry-generator-compat.result }}
-          WINDOWS_RESULT: ${{ needs.windows-generator.result }}
-          V3_RESULT: ${{ needs.strict-v3-frontend.result }}
-          MATRIX_RESULT: ${{ needs.generate-and-compile.result }}
-        run: |
-          test "$SNAPSHOT_RESULT" = success
-          test "$REGISTRY_RESULT" = success
-          test "$WINDOWS_RESULT" = success
-          test "$V3_RESULT" = success
-          test "$MATRIX_RESULT" = success
+      - name: Fail unless the historical registry matrix passed
+        if: >-
+          always() && (
+            needs.default-snapshot.result != 'success' ||
+            needs.registry-generator-compat.result != 'success' ||
+            needs.windows-generator.result != 'success' ||
+            needs.strict-v3-frontend.result != 'success' ||
+            needs.generate-and-compile.result != 'success'
+          )
+        run: exit 1
