@@ -41,6 +41,7 @@ jobs:
       - run: |
           v run scripts/publish_generated_branch.vsh --self-test
           v run scripts/open_generated_proposal.vsh --self-test
+          v run scripts/select_registry_version.vsh --self-test
 
   versions:
     needs: publisher-tests
@@ -52,46 +53,16 @@ jobs:
       branch: ${{ steps.versions.outputs.branch }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: prantlf/setup-v-action@92f20bea50d2c9931a28c96bb4997a3c7357baf0 # v4
+        with:
+          version: 0.5.2
+          install-dependencies: false
       - id: versions
         env:
           REQUESTED_VERSION: ${{ inputs.vk_docs_version }}
           FORCE_REGENERATE: ${{ inputs.force_regenerate }}
           TARGET_VERSION_URL: https://raw.githubusercontent.com/antono2/vulkan/master/VERSION
-        run: |
-          set -euo pipefail
-          current=$(curl --fail --silent --show-error --location "$TARGET_VERSION_URL")
-          requested=$REQUESTED_VERSION
-          if [[ -z "$requested" ]]; then
-            requested=$(git ls-remote --tags --refs https://github.com/KhronosGroup/Vulkan-Docs.git \
-              | awk -F/ '{print $NF}' \
-              | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' \
-              | sort -V | tail -n 1)
-          fi
-          [[ "$current" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
-            echo "Invalid published version: $current" >&2
-            exit 1
-          }
-          [[ "$requested" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
-            echo "Invalid requested version: $requested" >&2
-            exit 1
-          }
-          if [[ "$(printf '%s\n%s\n' "$current" "$requested" | sort -V | head -n 1)" != "$current" ]]; then
-            echo "Refusing to replace published registry $current with older $requested" >&2
-            exit 1
-          fi
-          changed=true
-          branch="generated/$requested"
-          if [[ "$current" == "$requested" ]]; then
-            changed=false
-            if [[ "$FORCE_REGENERATE" == true ]]; then
-              changed=true
-              branch="compat/generated-$requested"
-            fi
-          fi
-          echo "requested=$requested" >> "$GITHUB_OUTPUT"
-          echo "changed=$changed" >> "$GITHUB_OUTPUT"
-          echo "branch=$branch" >> "$GITHUB_OUTPUT"
-          echo "Current: $current; requested: $requested; update required: $changed; branch: $branch"
+        run: v run scripts/select_registry_version.vsh
 
   generate:
     needs: versions
