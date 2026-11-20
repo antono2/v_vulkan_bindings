@@ -148,9 +148,43 @@ jobs:
           VERSION: ${{ matrix.version }}
         run: v run scripts/check_historical_registry.vsh historical "$VERSION"
 
+  release-artifact:
+    name: Release artifact rehearsal
+    runs-on: ubuntu-24.04
+    env:
+      RELEASE_VERSION: v1.4.335
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: KhronosGroup/Vulkan-Docs
+          ref: ${{ env.RELEASE_VERSION }}
+          path: vulkandocs
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: KhronosGroup/Vulkan-Headers
+          ref: ${{ env.RELEASE_VERSION }}
+          path: vulkanheaders
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: antono2/vulkan
+          path: published
+      - uses: prantlf/setup-v-action@92f20bea50d2c9931a28c96bb4997a3c7357baf0 # v4
+        with:
+          version: 0.5.2
+      - name: Prepare the release artifact with the matching headers
+        run: v run scripts/release_workflow.vsh generate "$RELEASE_VERSION"
+      - uses: NcStudios/VulkanCI@1a5db3ebde578c503b1d7f8df007e42a7367224c # v1.2
+        env:
+          VK_CI_TEST_TAG_OVERRIDE: v1.2
+        with:
+          sdkVersion: 1.4.309.0
+      - name: Compile the staged release artifact
+        run: v run scripts/release_workflow.vsh smoke
+
   required-checks:
     if: always()
-    needs: [default-snapshot, registry-generator-compat, windows-generator, strict-v3-frontend, generate-and-compile]
+    needs: [default-snapshot, registry-generator-compat, windows-generator, strict-v3-frontend, generate-and-compile, release-artifact]
     runs-on: ubuntu-24.04
     steps:
       - name: Fail unless the historical registry matrix passed
@@ -160,6 +194,7 @@ jobs:
             needs.registry-generator-compat.result != 'success' ||
             needs.windows-generator.result != 'success' ||
             needs.strict-v3-frontend.result != 'success' ||
-            needs.generate-and-compile.result != 'success'
+            needs.generate-and-compile.result != 'success' ||
+            needs.release-artifact.result != 'success'
           )
         run: exit 1

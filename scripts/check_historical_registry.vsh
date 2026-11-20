@@ -2,49 +2,23 @@
 import crypto.sha256
 import os
 import rand
+import registryci
 
-const core = 'src/vulkan.v'
-const video = 'src/vulkan_video.v'
-const generated = [core, video]
 const pinned_v3 = '.ci-v-source/v'
 const usage = 'Usage: check_historical_registry.vsh snapshot | powershell | registry TAG | abi | strict | historical TAG'
 
-fn command(args []string) ! {
-	result := os.exec(args)
-	if result.output != '' {
-		print(result.output)
-	}
-	if result.exit_code != 0 {
-		return error('${args.join(' ')} failed (exit ${result.exit_code})')
-	}
-}
-
-fn verify_files() ! {
-	for path in generated {
-		if !os.is_file(path) {
-			return error('Missing generated bindings: ${path}')
-		}
-	}
-}
-
 fn snapshot(powershell bool) ! {
 	if powershell {
-		command(['pwsh', '-NoProfile', '-File', 'scripts/generate.ps1', '-VCompiler', @VEXE])!
+		registryci.command(['pwsh', '-NoProfile', '-File', 'scripts/generate.ps1', '-VCompiler',
+			@VEXE])!
 	} else {
-		command([@VEXE, 'run', 'scripts/generate.vsh'])!
+		registryci.command([@VEXE, 'run', 'scripts/generate.vsh'])!
 	}
-	verify_files()!
+	registryci.verify_files()!
 	mut args := ['git', 'diff', '--exit-code', '--']
-	args << generated
-	command(args)!
-	command(['git', 'diff', '--check'])!
-}
-
-fn generate_current() ! {
-	for generator in ['generate_core.vsh', 'generate_video.vsh'] {
-		command([@VEXE, 'run', os.join_path('scripts', generator)])!
-	}
-	verify_files()!
+	args << registryci.generated
+	registryci.command(args)!
+	registryci.command(['git', 'diff', '--check'])!
 }
 
 fn verify_registry_digest(tag string) ! {
@@ -59,45 +33,37 @@ fn verify_registry_digest(tag string) ! {
 		|| !expected[0].bytes().all(it.is_digit() || (it >= `a` && it <= `f`)) {
 		return error('Expected one SHA-256 digest for Vulkan-Docs ${tag}')
 	}
-	actual := sha256.sum(os.read_bytes(core)!).hex()
+	actual := sha256.sum(os.read_bytes(registryci.core)!).hex()
 	if actual != expected[0] {
-		return error('${core} differs for Vulkan-Docs ${tag}. Expected ${expected[0]}, got ${actual}')
+		return error('${registryci.core} differs for Vulkan-Docs ${tag}. Expected ${expected[0]}, got ${actual}')
 	}
-	println('${core}: verified Vulkan-Docs ${tag} SHA-256')
+	println('${registryci.core}: verified Vulkan-Docs ${tag} SHA-256')
 }
 
 fn verify_registry(tag string) ! {
-	generate_current()!
+	registryci.generate_current()!
 	for option in ['-w', '-verify'] {
-		command([@VEXE, 'fmt', option, core, video])!
+		registryci.command([@VEXE, 'fmt', option, registryci.core, registryci.video])!
 	}
 	verify_registry_digest(tag)!
-	command(['git', 'diff', '--check'])!
-}
-
-fn prepare_module(stage string) ! {
-	command([@VEXE, 'run', 'scripts/stage_generated_release.vsh', 'install-check'])!
-	organization := os.join_path(stage, 'antono2')
-	os.mkdir(organization)!
-	os.symlink(os.abs_path('published'), os.join_path(organization, 'vulkan'))!
-	os.setenv('VMODULES', stage, true)
+	registryci.command(['git', 'diff', '--check'])!
 }
 
 fn abi() ! {
 	modules := os.abs_path('abi-modules')
 	published := os.join_path(modules, 'antono2', 'vulkan')
-	for path in generated {
+	for path in registryci.generated {
 		os.cp(path, os.join_path(published, os.file_name(path)))!
 	}
 	os.cp_all('abi-headers/include', os.join_path(published, 'c/vendor/include'), true)!
 	os.setenv('VMODULES', modules, true)
-	command([@VEXE, '-cc', 'gcc', 'run', 'test/opaque_basetype'])!
+	registryci.command([@VEXE, '-cc', 'gcc', 'run', 'test/opaque_basetype'])!
 }
 
 fn strict(stage string) ! {
-	command([pinned_v3, 'version'])!
-	generate_current()!
-	core_text := os.read_file(core)!
+	registryci.command([pinned_v3, 'version'])!
+	registryci.generate_current()!
+	core_text := os.read_file(registryci.core)!
 	for declaration in ['pub const khr_xlib_surface_extension_name', '$if vulkan_xlib ? {',
 		'#flag -DVK_USE_PLATFORM_XLIB_KHR', '$if vulkan_win32 ? {'] {
 		if !core_text.contains(declaration) {
@@ -111,7 +77,7 @@ fn strict(stage string) ! {
 			return error('Missing pointer to the combiner operation array in ${name}')
 		}
 	}
-	video_text := os.read_file(video)!
+	video_text := os.read_file(registryci.video)!
 	if !video_text.contains('pub type StdVideoH264ScalingListsScalingList4x4Array') {
 		return error('Missing named H.264 scaling list array type')
 	}
@@ -125,18 +91,18 @@ fn strict(stage string) ! {
 			return error('PascalCase fixed-array fields must use named array aliases: ${line.trim_space()}')
 		}
 	}
-	prepare_module(stage)!
+	registryci.prepare_module(stage)!
 	// Use the pinned compiler's own library, independent of the launcher.
 	os.unsetenv('VEXE')
-	command([pinned_v3, '-new-compiler', '-check', 'test/main.c.v'])!
-	command([pinned_v3, '-new-compiler', '-d', 'vulkan_xlib', '-check', 'test/main.c.v'])!
+	registryci.command([pinned_v3, '-new-compiler', '-check', 'test/main.c.v'])!
+	registryci.command([pinned_v3, '-new-compiler', '-d', 'vulkan_xlib', '-check', 'test/main.c.v'])!
 }
 
 fn historical(stage string, tag string) ! {
-	command([@VEXE, 'version'])!
-	command([@VEXE, 'run', 'scripts/generate.vsh', tag])!
+	registryci.command([@VEXE, 'version'])!
+	registryci.command([@VEXE, 'run', 'scripts/generate.vsh', tag])!
 	verify_registry_digest(tag)!
-	prepare_module(stage)!
+	registryci.prepare_module(stage)!
 	os.write_file('published/VERSION', tag + '\n')!
 	sdk := os.getenv('VULKAN_SDK')
 	if sdk == '' || !os.is_dir(sdk) {
@@ -145,14 +111,14 @@ fn historical(stage string, tag string) ! {
 	volk := os.join_path(sdk, 'include', 'volk')
 	os.mkdir_all(volk)!
 	for file in ['volk.h', 'volk.c'] {
-		command(['curl', '--fail', '--silent', '--show-error', '--location',
+		registryci.command(['curl', '--fail', '--silent', '--show-error', '--location',
 			'https://raw.githubusercontent.com/zeux/volk/master/${file}', '--output',
 			os.join_path(volk,
 				file)])!
 	}
-	command([@VEXE, '-cc', 'gcc', 'run', 'test'])!
+	registryci.command([@VEXE, '-cc', 'gcc', 'run', 'test'])!
 	if tag == 'v1.4.335' {
-		command([@VEXE, '-d', 'vulkan_xlib', '-cc', 'gcc', 'run', 'test'])!
+		registryci.command([@VEXE, '-d', 'vulkan_xlib', '-cc', 'gcc', 'run', 'test'])!
 	}
 }
 
