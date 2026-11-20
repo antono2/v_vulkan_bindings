@@ -158,15 +158,17 @@ default setup command. The current snapshots use Vulkan-Docs `v1.4.365`
 (commit `8c9361ba8180c1f4164c0bf79de2f6e817770b0d`) and match the published
 module's declarations.
 
-Use V 0.5.2 for the committed formatting, regenerate with the default setup
-command and check for drift before submitting changes:
+With V 0.5.2, run the same snapshot check used in CI to regenerate both
+bindings and compare them with the committed files.
 
 ```sh
-v run scripts/generate.vsh
-git diff --exit-code -- src/vulkan.v src/vulkan_video.v
+v run scripts/check_historical_registry.vsh snapshot
 ```
 
-The default-snapshot CI check enforces this correspondence. Historical registry
+For a historical registry example, check out Vulkan-Docs `v1.4.368` in
+`vulkandocs/` and run `v run scripts/check_historical_registry.vsh registry v1.4.368`.
+The check verifies formatting for both bindings and compares the core binding
+with its recorded SHA-256 digest. Historical registry
 lanes intentionally generate other API versions and are separate compatibility
 checks; do not copy those outputs into the committed current snapshots. In the
 published module, `REGISTRY_COMMIT` pins Vulkan-Headers, not Vulkan-Docs.
